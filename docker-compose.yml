@@ -5,7 +5,6 @@ services:
     build: ./
     image: qmk:1.0
     container_name: qmk
-    restart: always
     ports:
       - 8080:8080
     environment:
