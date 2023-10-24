@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"cloud.google.com/go/firestore"
 	"context"
 	firebase "firebase.google.com/go"
@@ -252,6 +253,11 @@ func prepareKeyboardDirectory(keyboardId string) (string, error) {
 	return keyboardDirectoryFullPath, nil
 }
 
+func deleteKeyboardDirectory(keyboardId string) error {
+	keyboardDirectoryFullPath := filepath.Join(qmkFirmwareBaseDirectoryPath, "keyboards", keyboardId)
+	return os.RemoveAll(keyboardDirectoryFullPath)
+}
+
 func createFile(path string, content string) error {
 	f, err := os.Create(path)
 	if err != nil {
@@ -303,20 +309,16 @@ func buildQmkFirmware(keyboardId string) BuildResult {
 		"/root/.local/bin/qmk", "compile",
 		"-kb", keyboardId,
 		"-km", "remap")
-	//var stdout bytes.Buffer
-	//var stderr bytes.Buffer
-	//cmd.Stdout = &stdout
-	//cmd.Stderr = &stderr
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	err := cmd.Run()
 	log.Println("Building a QMK Firmware finished.")
-	//stdoutString := stdout.String()
-	stdoutString := ""
+	stdoutString := stdout.String()
 	if err != nil {
 		log.Println("Building failed.")
-		//stderrString := stderr.String()
-		stderrString := ""
+		stderrString := stderr.String()
 		log.Printf("[ERROR] %s\n", err.Error())
 		return BuildResult{
 			success: false,
@@ -544,6 +546,13 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 		return
 	}
 	log.Printf("[INFO] remoteFirmwareFilePath: %s\n", remoteFirmwareFilePath)
+
+	// Delete the keyboard directory.
+	err = deleteKeyboardDirectory(keyboardId)
+	if err != nil {
+		sendFailureResponseWithError(params.TaskId, firestoreClient, w, http.StatusInternalServerError, err)
+		return
+	}
 
 	// Update the task status to "success".
 	err = sendSuccessResponseWithStdout(params.TaskId, firestoreClient, w, buildResult.stdout, remoteFirmwareFilePath)
