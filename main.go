@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"cloud.google.com/go/firestore"
 	"context"
 	firebase "firebase.google.com/go"
@@ -304,16 +303,18 @@ func buildQmkFirmware(keyboardId string) BuildResult {
 		"/root/.local/bin/qmk", "compile",
 		"-kb", keyboardId,
 		"-km", "remap")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	//var stdout bytes.Buffer
+	//var stderr bytes.Buffer
+	//cmd.Stdout = &stdout
+	//cmd.Stderr = &stderr
 	err := cmd.Run()
 	log.Println("Building a QMK Firmware finished.")
-	stdoutString := stdout.String()
+	//stdoutString := stdout.String()
+	stdoutString := ""
 	if err != nil {
 		log.Println("Building failed.")
-		stderrString := stderr.String()
+		//stderrString := stderr.String()
+		stderrString := ""
 		log.Printf("[ERROR] %s\n", err.Error())
 		return BuildResult{
 			success: false,
