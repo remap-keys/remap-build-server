@@ -126,7 +126,7 @@ func main() {
 	// Start the HTTP server.
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8088"
+		port = "8080"
 	}
 	h := func(w http.ResponseWriter, r *http.Request) {
 		handleRequest(w, r, ctx, firestoreClient, storageClient)
