@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/rs/xid"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"io"
@@ -108,8 +107,9 @@ const qmkFirmwareBaseDirectoryPath string = "/root/versions/0.22.12"
 func main() {
 	// Prepare the Firestore firestoreClient.
 	ctx := context.Background()
-	sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
-	app, err := firebase.NewApp(ctx, nil, sa)
+	//sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
+	//app, err := firebase.NewApp(ctx, nil, sa)
+	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
