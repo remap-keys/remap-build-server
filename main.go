@@ -307,6 +307,8 @@ func buildQmkFirmware(keyboardId string) BuildResult {
 	//var stderr bytes.Buffer
 	//cmd.Stdout = &stdout
 	//cmd.Stderr = &stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	err := cmd.Run()
 	log.Println("Building a QMK Firmware finished.")
 	//stdoutString := stdout.String()
