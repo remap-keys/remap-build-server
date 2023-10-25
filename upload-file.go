@@ -6,6 +6,8 @@ import (
 	firebase "firebase.google.com/go"
 	"flag"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io"
 	"log"
 	"os"
@@ -25,7 +27,7 @@ func createFirestoreClient(ctx context.Context) *firestore.Client {
 }
 
 type Parameters struct {
-	FirmwareId string
+	KeyboardId string
 	FileType   string
 	FileName   string
 	FilePath   string
@@ -33,15 +35,15 @@ type Parameters struct {
 
 func parseCommandArguments() *Parameters {
 	var (
-		firmwareId = flag.String("f", "", "The firmware ID.")
+		keyboardId = flag.String("k", "", "The keyboard ID.")
 		fileType   = flag.String("t", "", "The file type.")
 		fileName   = flag.String("n", "", "The file name.")
 		filePath   = flag.String("p", "", "The file path.")
 	)
 	flag.Parse()
 
-	if *firmwareId == "" {
-		log.Fatalln("The firmware ID is required.")
+	if *keyboardId == "" {
+		log.Fatalln("The keyboard ID is required.")
 	}
 	if *fileType == "" {
 		log.Fatalln("The file type is required.")
@@ -57,7 +59,7 @@ func parseCommandArguments() *Parameters {
 	}
 
 	return &Parameters{
-		FirmwareId: *firmwareId,
+		KeyboardId: *keyboardId,
 		FileType:   *fileType,
 		FileName:   *fileName,
 		FilePath:   *filePath,
@@ -85,14 +87,52 @@ func uploadFileToFirestore(ctx context.Context, client *firestore.Client, params
 		subCollectionName = "keymapFiles"
 	}
 	log.Printf("Sub collection name: %s\n", subCollectionName)
-	log.Printf("Firmware ID: %s\n", params.FirmwareId)
-	_, _, err := client.Collection("build").Doc("v1").Collection("firmwares").Doc(params.FirmwareId).Collection(subCollectionName).Add(ctx, map[string]interface{}{
+	log.Printf("Firmware ID: %s\n", params.KeyboardId)
+	_, _, err := client.Collection("build").Doc("v1").Collection("firmwares").Doc(params.KeyboardId).Collection(subCollectionName).Add(ctx, map[string]interface{}{
 		"path":    params.FileName,
 		"content": content,
 	})
 	if err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func createFirmwareDocument(ctx context.Context, client *firestore.Client, params *Parameters, keyboardDefinition *KeyboardDefinition) {
+	firmwares := client.Collection("build").Doc("v1").Collection("firmwares")
+	_, err := firmwares.Doc(params.KeyboardId).Get(ctx)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			log.Printf("Firmware document not found: %s\n", params.KeyboardId)
+		} else {
+			log.Printf("Firmware document already exists: %s\n", params.KeyboardId)
+			return
+		}
+	}
+	_, err = firmwares.Doc(params.KeyboardId).Set(ctx, map[string]interface{}{
+		"keyboardDefinitionId": params.KeyboardId,
+		"uid":                  keyboardDefinition.AuthorUid,
+		"createdAt":            firestore.ServerTimestamp,
+		"updatedAt":            firestore.ServerTimestamp,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+}
+
+type KeyboardDefinition struct {
+	AuthorUid string `firestore:"author_uid"`
+}
+
+func fetchKeyboardDefinitionDocument(ctx context.Context, client *firestore.Client, params *Parameters) *KeyboardDefinition {
+	definitions := client.Collection("keyboards").Doc("v2").Collection("definitions")
+	ref, err := definitions.Doc(params.KeyboardId).Get(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var keyboardDefinition KeyboardDefinition
+	ref.DataTo(&keyboardDefinition)
+	log.Printf("Keyboard definition: %v\n", keyboardDefinition)
+	return &keyboardDefinition
 }
 
 func main() {
@@ -102,6 +142,10 @@ func main() {
 	log.Println("Firestore client created.")
 	params := parseCommandArguments()
 	log.Println("Command arguments parsed.")
+	keyboardDefinition := fetchKeyboardDefinitionDocument(ctx, client, params)
+	log.Println("Keyboard keyboardDefinition fetched.")
+	createFirmwareDocument(ctx, client, params, keyboardDefinition)
+	log.Println("Firmware document created.")
 	content := readFileContent(params.FilePath)
 	log.Println("File content read.")
 	uploadFileToFirestore(ctx, client, params, content)
