@@ -90,10 +90,10 @@ type Task struct {
 }
 
 type Firmware struct {
-	KeyboardDefinitionId  string    `firestore:"keyboardDefinitionId"`
-	KeyboardDirectoryPath string    `firestore:"keyboardDirectoryPath"`
-	CreatedAt             time.Time `firestore:"createdAt"`
-	UpdatedAt             time.Time `firestore:"updatedAt"`
+	KeyboardDefinitionId string    `firestore:"keyboardDefinitionId"`
+	uid                  string    `firestore:"uid"`
+	CreatedAt            time.Time `firestore:"createdAt"`
+	UpdatedAt            time.Time `firestore:"updatedAt"`
 }
 
 type FirmwareFile struct {
