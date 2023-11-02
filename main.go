@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cloud.google.com/go/firestore"
 	"context"
+	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"remap-keys.app/remap-build-server/parser"
 	"time"
 )
 
@@ -33,6 +35,7 @@ type Task struct {
 	FirmwareFilePath string    `firestore:"firmwareFilePath"`
 	Stdout           string    `firestore:"stdout"`
 	Stderr           string    `firestore:"stderr"`
+	ParametersJson   string    `firestore:"parametersJson"`
 	CreatedAt        time.Time `firestore:"createdAt"`
 	UpdatedAt        time.Time `firestore:"updatedAt"`
 }
@@ -45,8 +48,14 @@ type Firmware struct {
 }
 
 type FirmwareFile struct {
+	ID      string `firestore:"-"`
 	Path    string `firestore:"path"`
 	Content string `firestore:"content"`
+}
+
+type Parameters struct {
+	Keyboard map[string]map[string]string `json:"keyboard"`
+	Keymap   map[string]map[string]string `json:"keymap"`
 }
 
 // QMK Firmware base directory path.
@@ -147,6 +156,7 @@ func fetchKeyboardFiles(client *firestore.Client, firmwareId string) ([]*Firmwar
 		}
 		var keyboardFile FirmwareFile
 		doc.DataTo(&keyboardFile)
+		keyboardFile.ID = doc.Ref.ID
 		keyboardFiles = append(keyboardFiles, &keyboardFile)
 	}
 	return keyboardFiles, nil
@@ -167,6 +177,7 @@ func fetchKeymapFiles(client *firestore.Client, firmwareId string) ([]*FirmwareF
 		}
 		var keymapFile FirmwareFile
 		doc.DataTo(&keymapFile)
+		keymapFile.ID = doc.Ref.ID
 		keymapFiles = append(keymapFiles, &keymapFile)
 	}
 	return keymapFiles, nil
@@ -382,6 +393,20 @@ func sendSuccessResponseWithStdout(taskId string, client *firestore.Client, w ht
 	return nil
 }
 
+// Replaces the parameters in the keyboard files.
+func replaceParameters(files []*FirmwareFile, parameterFileMap map[string]map[string]string) []*FirmwareFile {
+	for _, file := range files {
+		parameterMap := parameterFileMap[file.ID]
+		if parameterMap == nil {
+			// If there is no parameter map for the firmware file, skip this file.
+			continue
+		}
+		newContent := parser.ReplaceParameters(file.Content, parameterMap)
+		file.Content = newContent
+	}
+	return files
+}
+
 // Handles the HTTP request.
 func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, firestoreClient *firestore.Client, storageClient *storage.Client) {
 	log.Printf("%s %s %s\n", r.Method, r.URL, r.Proto)
@@ -411,6 +436,14 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Check whether the uid in the task information and passed uid are the same.
 	if task.Uid != params.Uid {
 		sendFailureResponseWithError(params.TaskId, firestoreClient, w, fmt.Errorf("uid in the task information and passed uid are not the same"))
+		return
+	}
+
+	// Parse the parameters JSON string.
+	var parameters Parameters
+	err = json.Unmarshal([]byte(task.ParametersJson), &parameters)
+	if err != nil {
+		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
 		return
 	}
 
@@ -444,6 +477,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 		return
 	}
 	log.Printf("[INFO] keymapFiles: %+v\n", keymapFiles)
+
+	// Replace parameters.
+	keyboardFiles = replaceParameters(keyboardFiles, parameters.Keyboard)
+	keymapFiles = replaceParameters(keymapFiles, parameters.Keymap)
 
 	// Generate the keyboard ID.
 	keyboardId := generateKeyboardId()
