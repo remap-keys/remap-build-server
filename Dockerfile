@@ -21,6 +21,7 @@ RUN qmk setup --yes --home /root/versions/0.22.12 --branch 0.22.12
 COPY go.* ./
 RUN go mod download
 COPY ./main.go ./
+COPY ./parser/*.go ./parser/
 # RUN go test -v ./...
 RUN go build -mod=readonly -v -o server
 
