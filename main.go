@@ -18,7 +18,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"remap-keys.app/remap-build-server/parser"
 	"time"
 )
@@ -344,14 +343,6 @@ func sendFailureResponseWithStdoutAndStderr(taskId string, client *firestore.Cli
 	io.WriteString(w, err.Error())
 }
 
-// The stdout string includes like "Checking file size of ckpr5gut7qls715olr70_remap.hex"
-// This function returns only the firmware file name from the stdout.
-func fetchFirmwareFileName(stdout string) string {
-	r := regexp.MustCompile(`Checking file size of (.+_remap.[a-z]+)`)
-	fs := r.FindStringSubmatch(stdout)
-	return fs[1]
-}
-
 func uploadFirmwareFileToCloudStorage(ctx context.Context, storageClient *storage.Client, uid string, firmwareFileName string, localFirmwareFilePath string) (string, error) {
 	log.Println("Uploading the firmware file to the Cloud Storage.")
 
@@ -524,7 +515,11 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	log.Printf("[INFO] Building succeeded\n")
 
 	// Create the local firmware file path.
-	firmwareFileName := fetchFirmwareFileName(buildResult.stdout)
+	firmwareFileName, err := parser.FetchFirmwareFileName(buildResult.stdout)
+	if err != nil {
+		sendFailureResponseWithStdoutAndStderr(params.TaskId, firestoreClient, w, err.Error(), buildResult.stdout, buildResult.stderr)
+		return
+	}
 	localFirmwareFilePath := filepath.Join(qmkFirmwareBaseDirectoryPath, firmwareFileName)
 	log.Printf("[INFO] localFirmwareFilePath: %s\n", localFirmwareFilePath)
 
