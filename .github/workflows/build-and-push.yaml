@@ -1,0 +1,39 @@
+name: Build and push Remap build server docker image to Google Artifact Registry
+
+on:
+  push:
+    tags:
+      - 'v*.*'
+
+jobs:
+  build-and-push:
+    name: Build and Push docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup Google Cloud
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          service_account_key: ${{ secrets.GCLOUD_SERVICE_ACCOUNT }}
+          project_id: remap-b2d08
+
+      - name: Configure docker for artifact registry
+        run: |
+          gcloud auth configure-docker asia-northeast1-docker.pkg.dev
+
+      - name: set TAG
+        run: |
+          echo "TAG=$(echo $GITHUB_REF | awk -F/ '{print $NF}')" >> $GITHUB_ENV
+
+      - name: Build
+        run: |
+          docker build -t asia-northeast1-docker.pkg.dev/remap-b2d08/remap-artifacts/remap-build-server:${{ env.TAG }} ./
+
+      - name: Push
+        run: |
+          docker push asia-northeast1-docker.pkg.dev/remap-b2d08/remap-artifacts/remap-build-server:${{ env.TAG }}
