@@ -17,7 +17,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Setup Google Cloud
-        uses: google-github-actions/setup-gcloud@master
+        uses: google-github-actions/setup-gcloud@main
         with:
           service_account_key: ${{ secrets.GCLOUD_SERVICE_ACCOUNT }}
           project_id: remap-b2d08
