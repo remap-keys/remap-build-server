@@ -1,0 +1,13 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-docker-image'
+    args: [ 'build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}', '.' ]
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-docker-image'
+    args: [ 'push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}' ]
+images:
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}'
+substitutions:
+  _REGION: asia-northeast1
+  _REPOSITORY: remap-artifacts
+  _IMAGE: remap-build-server
