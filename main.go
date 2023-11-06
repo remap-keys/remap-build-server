@@ -81,8 +81,9 @@ func main() {
 
 	// Start the HTTP server.
 	port := os.Getenv("PORT")
+	log.Printf("PORT(Env): %s\n", port)
 	if port == "" {
-		port = "8080"
+		port = "80"
 	}
 	h := func(w http.ResponseWriter, r *http.Request) {
 		handleRequest(w, r, ctx, firestoreClient, storageClient)
