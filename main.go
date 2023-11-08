@@ -409,16 +409,6 @@ func replaceParameters(files []*FirmwareFile, parameterFileMap map[string]map[st
 func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, firestoreClient *firestore.Client, storageClient *storage.Client) {
 	log.Printf("%s %s %s\n", r.Method, r.URL, r.Proto)
 
-	// Check the authentication token.
-	err := auth.CheckAuthenticationToken(r)
-	if err != nil {
-		log.Printf("[ERROR] %s\n", err.Error())
-		// Return the error message, but return the status code 200 to avoid the retry with Cloud Tasks.
-		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, err.Error())
-		return
-	}
-
 	// Fetch the query parameters (uid and taskId).
 	params, err := parseQueryParameters(r)
 	if err != nil {
@@ -444,6 +434,13 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Check whether the uid in the task information and passed uid are the same.
 	if task.Uid != params.Uid {
 		sendFailureResponseWithError(params.TaskId, firestoreClient, w, fmt.Errorf("uid in the task information and passed uid are not the same"))
+		return
+	}
+
+	// Check the authentication token.
+	err = auth.CheckAuthenticationToken(r)
+	if err != nil {
+		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
 		return
 	}
 
