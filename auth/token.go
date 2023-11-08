@@ -6,7 +6,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"regexp"
-	"strings"
 )
 
 func CheckAuthenticationToken(r *http.Request) error {
@@ -44,10 +43,6 @@ func CheckAuthenticationToken(r *http.Request) error {
 	email := claims["email"]
 	if email.(string) != "remap-build-server-task-auth@remap-b2d08.iam.gserviceaccount.com" {
 		return fmt.Errorf("email is invalid")
-	}
-	aud := claims["aud"]
-	if !strings.HasPrefix(aud.(string), "https://build.remap-keys.app/build?") {
-		return fmt.Errorf("aud is invalid")
 	}
 	return nil
 }
