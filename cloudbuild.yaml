@@ -5,9 +5,6 @@ steps:
   - name: 'gcr.io/cloud-builders/docker'
     id: 'push-docker-image'
     args: [ 'push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}' ]
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
-    args: [ 'compute', 'instances', 'update-container', 'remap-build-server', '--container-image', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}:latest', '--zone', 'asia-northeast1-b' ]
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE}'
 substitutions:
