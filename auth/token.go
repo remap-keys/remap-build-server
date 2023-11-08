@@ -46,7 +46,7 @@ func CheckAuthenticationToken(r *http.Request) error {
 		return fmt.Errorf("email is invalid")
 	}
 	aud := claims["aud"]
-	if strings.HasPrefix(aud.(string), "https://build.remap-keys.app/build?") {
+	if !strings.HasPrefix(aud.(string), "https://build.remap-keys.app/build?") {
 		return fmt.Errorf("aud is invalid")
 	}
 	return nil
