@@ -3,8 +3,6 @@ services:
 
   remap-build-server:
     build: ./
-    image: qmk:1.0
-    container_name: qmk
     ports:
       - 8080:8080
     environment:
