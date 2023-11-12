@@ -347,7 +347,7 @@ func sendFailureResponseWithStdoutAndStderr(taskId string, client *firestore.Cli
 	}
 	// Return the error message, but return the status code 200 to avoid the retry with Cloud Tasks.
 	w.WriteHeader(http.StatusOK)
-	io.WriteString(w, err.Error())
+	io.WriteString(w, message)
 }
 
 func uploadFirmwareFileToCloudStorage(ctx context.Context, storageClient *storage.Client, uid string, firmwareFileName string, localFirmwareFilePath string) (string, error) {
