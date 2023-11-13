@@ -15,14 +15,17 @@ ENV PATH=$HOME/.local/bin:$PATH
 
 RUN python3 -m pip install --user qmk
 
-RUN mkdir -p /root/versions/0.22.12
-RUN qmk setup --yes --home /root/versions/0.22.12 --branch 0.22.12
+RUN mkdir -p /root/versions/0.22.14
+RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
 
 COPY go.* ./
 RUN go mod download
 COPY ./main.go ./
-COPY ./parser/*.go ./parser/
 COPY ./auth/*.go ./auth/
+COPY ./build/*.go ./build/
+COPY ./database/*.go ./database/
+COPY ./parameter/*.go ./parameter/
+COPY ./web/*.go ./web/
 # RUN go test -v ./...
 RUN go build -mod=readonly -v -o server
 
