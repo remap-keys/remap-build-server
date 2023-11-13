@@ -15,8 +15,6 @@ ENV PATH=$HOME/.local/bin:$PATH
 
 RUN python3 -m pip install --user qmk
 
-RUN mkdir -p /root/versions/0.22.12
-RUN qmk setup --yes --home /root/versions/0.22.12 --branch 0.22.12
 RUN mkdir -p /root/versions/0.22.14
 RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
 
