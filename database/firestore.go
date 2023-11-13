@@ -113,15 +113,16 @@ func FetchKeymapFiles(client *firestore.Client, firmwareId string) ([]*FirmwareF
 
 // UpdateTaskStatusToBuilding updates the task status to "building".
 func UpdateTaskStatusToBuilding(ctx context.Context, client *firestore.Client, taskId string) error {
+	return UpdateTask(ctx, client, taskId, "building", "", "", "")
+}
+
+func UpdateTask(ctx context.Context, client *firestore.Client, taskId string, status string, stdout string, stderr string, firmwareFilePath string) error {
 	_, err := client.Collection("build").Doc("v1").Collection("tasks").Doc(taskId).Set(ctx, map[string]interface{}{
-		"status":           "building",
-		"stdout":           "",
-		"stderr":           "",
-		"firmwareFilePath": "",
+		"status":           status,
+		"stdout":           stdout,
+		"stderr":           stderr,
+		"firmwareFilePath": firmwareFilePath,
 		"updatedAt":        time.Now(),
 	}, firestore.MergeAll)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

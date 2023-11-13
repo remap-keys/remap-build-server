@@ -7,7 +7,6 @@ import (
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
 	"fmt"
-	"google.golang.org/api/option"
 	"io"
 	"log"
 	"net/http"
@@ -18,7 +17,6 @@ import (
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
-	"time"
 )
 
 type Parameters struct {
@@ -57,25 +55,19 @@ func main() {
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
-	sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
-	app, err := firebase.NewApp(ctx, nil, sa)
-	//app, err := firebase.NewApp(ctx, nil)
+	//sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
+	//app, err := firebase.NewApp(ctx, nil, sa)
+	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	return app
 }
 
-func sendFailureResponseWithError(taskId string, client *firestore.Client, w http.ResponseWriter, cause error) {
+func sendFailureResponseWithError(ctx context.Context, taskId string, client *firestore.Client, w http.ResponseWriter, cause error) {
 	log.Printf("[ERROR] %s\n", cause.Error())
 	// Update the task status to "failure".
-	_, err := client.Collection("build").Doc("v1").Collection("tasks").Doc(taskId).Set(context.Background(), map[string]interface{}{
-		"status":           "failure",
-		"stdout":           "",
-		"stderr":           cause.Error(),
-		"firmwareFilePath": "",
-		"updatedAt":        time.Now(),
-	}, firestore.MergeAll)
+	err := database.UpdateTask(ctx, client, taskId, "failure", "", cause.Error(), "")
 	if err != nil {
 		// Ignore the error about updating the task status.
 		log.Printf("[ERROR] %s\n", err.Error())
@@ -85,16 +77,10 @@ func sendFailureResponseWithError(taskId string, client *firestore.Client, w htt
 	io.WriteString(w, cause.Error())
 }
 
-func sendFailureResponseWithStdoutAndStderr(taskId string, client *firestore.Client, w http.ResponseWriter, message string, stdout string, stderr string) {
+func sendFailureResponseWithStdoutAndStderr(ctx context.Context, taskId string, client *firestore.Client, w http.ResponseWriter, message string, stdout string, stderr string) {
 	log.Printf("[ERROR] %s\n", message)
 	// Update the task status to "failure".
-	_, err := client.Collection("build").Doc("v1").Collection("tasks").Doc(taskId).Set(context.Background(), map[string]interface{}{
-		"status":           "failure",
-		"stdout":           stdout,
-		"stderr":           stderr,
-		"firmwareFilePath": "",
-		"updatedAt":        time.Now(),
-	}, firestore.MergeAll)
+	err := database.UpdateTask(ctx, client, taskId, "failure", stdout, stderr, "")
 	if err != nil {
 		log.Printf("[ERROR] %s\n", err.Error())
 	}
@@ -103,14 +89,8 @@ func sendFailureResponseWithStdoutAndStderr(taskId string, client *firestore.Cli
 	io.WriteString(w, message)
 }
 
-func sendSuccessResponseWithStdout(taskId string, client *firestore.Client, w http.ResponseWriter, stdout string, remoteFirmwareFilePath string) error {
-	_, err := client.Collection("build").Doc("v1").Collection("tasks").Doc(taskId).Set(context.Background(), map[string]interface{}{
-		"status":           "success",
-		"stdout":           stdout,
-		"stderr":           "",
-		"firmwareFilePath": remoteFirmwareFilePath,
-		"updatedAt":        time.Now(),
-	}, firestore.MergeAll)
+func sendSuccessResponseWithStdout(ctx context.Context, taskId string, client *firestore.Client, w http.ResponseWriter, stdout string, remoteFirmwareFilePath string) error {
+	err := database.UpdateTask(ctx, client, taskId, "success", stdout, "", remoteFirmwareFilePath)
 	if err != nil {
 		return err
 	}
@@ -147,50 +127,50 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 
 	// Check whether the uid in the task information and passed uid are the same.
 	if task.Uid != params.Uid {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, fmt.Errorf("uid in the task information and passed uid are not the same"))
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, fmt.Errorf("uid in the task information and passed uid are not the same"))
 		return
 	}
 
 	// Check the authentication token.
 	err = auth.CheckAuthenticationToken(r)
 	if err != nil {
-		//sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
-		//return
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
 	}
 
 	// Parse the parameters JSON string.
 	var parameters Parameters
 	err = json.Unmarshal([]byte(task.ParametersJson), &parameters)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 
 	// Update the task status to "building".
 	err = database.UpdateTaskStatusToBuilding(ctx, firestoreClient, params.TaskId)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 
 	// Fetch the firmware information from the Firestore.
 	firmware, err := database.FetchFirmwareInfo(firestoreClient, task)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	log.Printf("[INFO] The firmware [%+v] exists. The keyboard definition ID is [%+v]\n", task.FirmwareId, firmware.KeyboardDefinitionId)
 
 	// Check whether the firmware is enabled.
 	if !firmware.Enabled {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, fmt.Errorf("the firmware is not enabled"))
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, fmt.Errorf("the firmware is not enabled"))
 		return
 	}
 
 	// Fetch the keyboard files from the Firestore.
 	keyboardFiles, err := database.FetchKeyboardFiles(firestoreClient, task.FirmwareId)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	log.Printf("[INFO] keyboardFiles: %+v\n", keyboardFiles)
@@ -198,7 +178,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Fetch the keymap files from the Firestore.
 	keymapFiles, err := database.FetchKeymapFiles(firestoreClient, task.FirmwareId)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	log.Printf("[INFO] keymapFiles: %+v\n", keymapFiles)
@@ -214,15 +194,25 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Prepare the keyboard directory.
 	keyboardDirectoryPath, err := build.PrepareKeyboardDirectory(keyboardId, firmware.QmkFirmwareVersion)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	log.Printf("[INFO] Keyboard directory path: %s\n", keyboardDirectoryPath)
 
+	// Delete the keyboard directory after the function returns.
+	defer func() {
+		// Delete the keyboard directory.
+		err = build.DeleteKeyboardDirectory(keyboardId, firmware.QmkFirmwareVersion)
+		if err != nil {
+			log.Printf("[ERROR] %s\n", err.Error())
+		}
+		log.Printf("[INFO] Deleted the keyboard directory: %s\n", keyboardDirectoryPath)
+	}()
+
 	// Create the keyboard files.
 	err = build.CreateFirmwareFiles(keyboardDirectoryPath, keyboardFiles)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 
@@ -230,12 +220,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	keymapDirectoryPath := filepath.Join(keyboardDirectoryPath, "keymaps", "remap")
 	err = os.MkdirAll(keymapDirectoryPath, 0755)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	err = build.CreateFirmwareFiles(keymapDirectoryPath, keymapFiles)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 
@@ -243,7 +233,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	buildResult := build.BuildQmkFirmware(keyboardId, firmware.QmkFirmwareVersion)
 	log.Printf("[INFO] buildResult: %v\n", buildResult.Success)
 	if !buildResult.Success {
-		sendFailureResponseWithStdoutAndStderr(params.TaskId, firestoreClient, w, "Building failed", buildResult.Stdout, buildResult.Stderr)
+		sendFailureResponseWithStdoutAndStderr(ctx, params.TaskId, firestoreClient, w, "Building failed", buildResult.Stdout, buildResult.Stderr)
 		return
 	}
 	log.Printf("[INFO] Building succeeded\n")
@@ -251,7 +241,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Create the local firmware file path.
 	firmwareFileName, err := parameter.FetchFirmwareFileName(buildResult.Stdout)
 	if err != nil {
-		sendFailureResponseWithStdoutAndStderr(params.TaskId, firestoreClient, w, err.Error(), buildResult.Stdout, buildResult.Stderr)
+		sendFailureResponseWithStdoutAndStderr(ctx, params.TaskId, firestoreClient, w, err.Error(), buildResult.Stdout, buildResult.Stderr)
 		return
 	}
 	localFirmwareFilePath := filepath.Join(
@@ -261,21 +251,14 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Upload the firmware file to the Cloud Storage.
 	remoteFirmwareFilePath, err := database.UploadFirmwareFileToCloudStorage(ctx, storageClient, params.Uid, firmwareFileName, localFirmwareFilePath)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 	log.Printf("[INFO] remoteFirmwareFilePath: %s\n", remoteFirmwareFilePath)
 
-	// Delete the keyboard directory.
-	err = build.DeleteKeyboardDirectory(keyboardId, firmware.QmkFirmwareVersion)
-	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
-		return
-	}
-
 	// Update the task status to "success".
-	err = sendSuccessResponseWithStdout(params.TaskId, firestoreClient, w, buildResult.Stdout, remoteFirmwareFilePath)
+	err = sendSuccessResponseWithStdout(ctx, params.TaskId, firestoreClient, w, buildResult.Stdout, remoteFirmwareFilePath)
 	if err != nil {
-		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 	}
 }
