@@ -181,6 +181,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}
 	log.Printf("[INFO] The firmware [%+v] exists. The keyboard definition ID is [%+v]\n", task.FirmwareId, firmware.KeyboardDefinitionId)
 
+	// Check whether the firmware is enabled.
+	if !firmware.Enabled {
+		sendFailureResponseWithError(params.TaskId, firestoreClient, w, fmt.Errorf("the firmware is not enabled"))
+		return
+	}
+
 	// Fetch the keyboard files from the Firestore.
 	keyboardFiles, err := database.FetchKeyboardFiles(firestoreClient, task.FirmwareId)
 	if err != nil {
@@ -206,7 +212,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	log.Printf("[INFO] keyboardId: %s\n", keyboardId)
 
 	// Prepare the keyboard directory.
-	keyboardDirectoryPath, err := build.PrepareKeyboardDirectory(keyboardId)
+	keyboardDirectoryPath, err := build.PrepareKeyboardDirectory(keyboardId, firmware.QmkFirmwareVersion)
 	if err != nil {
 		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
 		return
@@ -234,7 +240,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}
 
 	// Build the QMK Firmware.
-	buildResult := build.BuildQmkFirmware(keyboardId)
+	buildResult := build.BuildQmkFirmware(keyboardId, firmware.QmkFirmwareVersion)
 	log.Printf("[INFO] buildResult: %v\n", buildResult.Success)
 	if !buildResult.Success {
 		sendFailureResponseWithStdoutAndStderr(params.TaskId, firestoreClient, w, "Building failed", buildResult.Stdout, buildResult.Stderr)
@@ -248,7 +254,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 		sendFailureResponseWithStdoutAndStderr(params.TaskId, firestoreClient, w, err.Error(), buildResult.Stdout, buildResult.Stderr)
 		return
 	}
-	localFirmwareFilePath := filepath.Join(build.QmkFirmwareBaseDirectoryPath, firmwareFileName)
+	localFirmwareFilePath := filepath.Join(
+		build.QmkFirmwareBaseDirectoryPath+firmware.QmkFirmwareVersion, firmwareFileName)
 	log.Printf("[INFO] localFirmwareFilePath: %s\n", localFirmwareFilePath)
 
 	// Upload the firmware file to the Cloud Storage.
@@ -260,7 +267,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	log.Printf("[INFO] remoteFirmwareFilePath: %s\n", remoteFirmwareFilePath)
 
 	// Delete the keyboard directory.
-	err = build.DeleteKeyboardDirectory(keyboardId)
+	err = build.DeleteKeyboardDirectory(keyboardId, firmware.QmkFirmwareVersion)
 	if err != nil {
 		sendFailureResponseWithError(params.TaskId, firestoreClient, w, err)
 		return

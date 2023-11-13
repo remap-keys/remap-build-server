@@ -10,8 +10,8 @@ import (
 	"remap-keys.app/remap-build-server/database"
 )
 
-// QMK Firmware base directory path.
-const QmkFirmwareBaseDirectoryPath string = "/root/versions/0.22.12"
+// QmkFirmwareBaseDirectoryPath is QMK Firmware base directory path.
+const QmkFirmwareBaseDirectoryPath string = "/root/versions/"
 
 // BuildResult represents the result of the build.
 type BuildResult struct {
@@ -67,13 +67,13 @@ func CreateFirmwareFiles(baseDirectoryPath string, firmwareFiles []*database.Fir
 }
 
 // BuildQmkFirmware builds a QMK Firmware.
-func BuildQmkFirmware(keyboardId string) BuildResult {
+func BuildQmkFirmware(keyboardId string, qmkFirmwareVersion string) BuildResult {
 	log.Println("Building a QMK Firmware started.")
 	cmd := exec.Command(
 		"/root/.local/bin/qmk", "compile",
 		"-kb", keyboardId,
 		"-km", "remap")
-	cmd.Dir = "/root/versions/0.22.12"
+	cmd.Dir = "/root/versions/" + qmkFirmwareVersion
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -100,17 +100,19 @@ func BuildQmkFirmware(keyboardId string) BuildResult {
 }
 
 // DeleteKeyboardDirectory deletes the keyboard directory.
-func DeleteKeyboardDirectory(keyboardId string) error {
-	keyboardDirectoryFullPath := filepath.Join(QmkFirmwareBaseDirectoryPath, "keyboards", keyboardId)
+func DeleteKeyboardDirectory(keyboardId string, qmkFirmwareVersion string) error {
+	keyboardDirectoryFullPath := filepath.Join(
+		QmkFirmwareBaseDirectoryPath+qmkFirmwareVersion, "keyboards", keyboardId)
 	return os.RemoveAll(keyboardDirectoryFullPath)
 }
 
 // PrepareKeyboardDirectory prepares the keyboard directory in the QMK Firmware base directory.
 // For instance, remove the directory if it exists and create a new directory.
 // Returns the keyboard directory path if succeeded.
-func PrepareKeyboardDirectory(keyboardId string) (string, error) {
+func PrepareKeyboardDirectory(keyboardId string, qmkFirmwareVersion string) (string, error) {
 	log.Println("Preparing the keyboard directory.")
-	keyboardDirectoryFullPath := filepath.Join(QmkFirmwareBaseDirectoryPath, "keyboards", keyboardId)
+	keyboardDirectoryFullPath := filepath.Join(
+		QmkFirmwareBaseDirectoryPath+qmkFirmwareVersion, "keyboards", keyboardId)
 	log.Printf("[INFO] keyboardDirectoryFullPath: %s\n", keyboardDirectoryFullPath)
 	_, err := os.Stat(keyboardDirectoryFullPath)
 	if err == nil {
