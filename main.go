@@ -3,14 +3,11 @@ package main
 import (
 	"cloud.google.com/go/firestore"
 	"context"
-	"crypto/rand"
-	"crypto/tls"
 	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
 	"fmt"
 	"golang.org/x/crypto/acme/autocert"
-	"golang.org/x/net/http2"
 	"io"
 	"log"
 	"net/http"
@@ -21,7 +18,6 @@ import (
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
-	"time"
 )
 
 type Parameters struct {
@@ -44,31 +40,59 @@ func main() {
 	}
 
 	certCache := web.NewFirestoreCertCache(firestoreClient)
+
+	// Let's Encryptの設定
 	certManager := autocert.Manager{
-		Cache:      certCache,
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist("build.remap-keys.app"),
+		Cache:      certCache,                                      // Firestoreを使用するカスタムキャッシュ
+		HostPolicy: autocert.HostWhitelist("build.remap-keys.app"), // あなたのドメインを設定
 	}
 
-	h := func(w http.ResponseWriter, r *http.Request) {
-		handleRequest(w, r, ctx, firestoreClient, storageClient)
-	}
-	http.HandleFunc("/build", h)
+	// ルーティングの設定
+	http.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handleRequest(w, r, ctx, firestoreClient, storageClient)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
 
-	tlsConfig := &tls.Config{
-		Rand:           rand.Reader,
-		Time:           time.Now,
-		NextProtos:     []string{http2.NextProtoTLS, "http/1.1"},
-		MinVersion:     tls.VersionTLS12,
-		GetCertificate: certManager.GetCertificate,
-	}
-
+	// HTTPSサーバーの設定
 	server := &http.Server{
 		Addr:      ":https",
-		TLSConfig: tlsConfig,
+		TLSConfig: certManager.TLSConfig(),
+		Handler:   nil,
 	}
-	go http.ListenAndServe(":http", certManager.HTTPHandler(nil))
-	log.Fatal(server.ListenAndServeTLS("", ""))
+
+	// HTTPSサーバーの起動
+	log.Fatal(server.ListenAndServeTLS("", "")) // Let's Encrypt証明書を使用
+
+	//certCache := web.NewFirestoreCertCache(firestoreClient)
+	//certManager := autocert.Manager{
+	//	Cache:      certCache,
+	//	Prompt:     autocert.AcceptTOS,
+	//	HostPolicy: autocert.HostWhitelist("build.remap-keys.app"),
+	//}
+	//
+	//h := func(w http.ResponseWriter, r *http.Request) {
+	//	handleRequest(w, r, ctx, firestoreClient, storageClient)
+	//}
+	//http.HandleFunc("/build", h)
+	//
+	//tlsConfig := &tls.Config{
+	//	Rand:           rand.Reader,
+	//	Time:           time.Now,
+	//	NextProtos:     []string{http2.NextProtoTLS, "http/1.1"},
+	//	MinVersion:     tls.VersionTLS12,
+	//	GetCertificate: certManager.GetCertificate,
+	//}
+	//
+	//server := &http.Server{
+	//	Addr:      ":https",
+	//	TLSConfig: tlsConfig,
+	//}
+	//go http.ListenAndServe(":http", certManager.HTTPHandler(nil))
+	//log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
