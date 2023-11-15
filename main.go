@@ -3,10 +3,14 @@ package main
 import (
 	"cloud.google.com/go/firestore"
 	"context"
+	"crypto/rand"
+	"crypto/tls"
 	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
 	"fmt"
+	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/net/http2"
 	"io"
 	"log"
 	"net/http"
@@ -17,6 +21,7 @@ import (
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
+	"time"
 )
 
 type Parameters struct {
@@ -38,20 +43,32 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// Start the HTTP server.
-	port := os.Getenv("PORT")
-	log.Printf("PORT(Env): %s\n", port)
-	if port == "" {
-		port = "80"
+	certCache := web.NewFirestoreCertCache(firestoreClient)
+	certManager := autocert.Manager{
+		Cache:      certCache,
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist("build.remap-keys.app"),
 	}
+
 	h := func(w http.ResponseWriter, r *http.Request) {
 		handleRequest(w, r, ctx, firestoreClient, storageClient)
 	}
 	http.HandleFunc("/build", h)
-	log.Printf("Remap Build Server is running on port %s.\n", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
+
+	tlsConfig := &tls.Config{
+		Rand:           rand.Reader,
+		Time:           time.Now,
+		NextProtos:     []string{http2.NextProtoTLS, "http/1.1"},
+		MinVersion:     tls.VersionTLS12,
+		GetCertificate: certManager.GetCertificate,
 	}
+
+	server := &http.Server{
+		Addr:      ":https",
+		TLSConfig: tlsConfig,
+	}
+	go http.ListenAndServe(":http", certManager.HTTPHandler(nil))
+	log.Fatal(server.ListenAndServeTLS("", ""))
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
