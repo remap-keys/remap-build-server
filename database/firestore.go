@@ -102,7 +102,7 @@ func UpdateTask(ctx context.Context, client *firestore.Client, taskId string, st
 }
 
 func FetchCertificate(ctx context.Context, client *firestore.Client, key string) (*common.Certificate, error) {
-	iter := client.Collection("certifications").Where("domain", "==", key).Documents(ctx)
+	iter := client.Collection("certificates").Where("domain", "==", key).Documents(ctx)
 	for {
 		doc, err := iter.Next()
 		if errors.Is(err, iterator.Done) {
@@ -130,13 +130,13 @@ func SaveCertificate(ctx context.Context, client *firestore.Client, key string, 
 	}
 	log.Printf("[Info] Saving the certificate to the Firestore: %v", key)
 	if certificate == nil {
-		_, _, err := client.Collection("certifications").Add(ctx, common.Certificate{Domain: key, Data: data})
+		_, _, err := client.Collection("certificates").Add(ctx, common.Certificate{Domain: key, Data: data})
 		if err != nil {
 			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
 			return err
 		}
 	} else {
-		_, err := client.Collection("certifications").Doc(certificate.ID).Set(ctx, common.Certificate{Domain: key, Data: data})
+		_, err := client.Collection("certificates").Doc(certificate.ID).Set(ctx, common.Certificate{Domain: key, Data: data})
 		if err != nil {
 			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
 			return err
@@ -155,7 +155,7 @@ func DeleteCertificate(ctx context.Context, client *firestore.Client, key string
 	if certificate == nil {
 		return fmt.Errorf("certificate not found")
 	}
-	_, err = client.Collection("certifications").Doc(certificate.ID).Delete(ctx)
+	_, err = client.Collection("certificates").Doc(certificate.ID).Delete(ctx)
 	if err != nil {
 		log.Printf("[Error] Failed to delete the certificate from the Firestore: %v", err)
 		return err
