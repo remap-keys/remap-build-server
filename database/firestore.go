@@ -3,44 +3,18 @@ package database
 import (
 	"cloud.google.com/go/firestore"
 	"context"
+	"errors"
 	"fmt"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"log"
-	"remap-keys.app/remap-build-server/web"
+	"remap-keys.app/remap-build-server/common"
 	"time"
 )
 
-type Task struct {
-	Uid              string    `firestore:"uid"`
-	Status           string    `firestore:"status"`
-	FirmwareId       string    `firestore:"firmwareId"`
-	FirmwareFilePath string    `firestore:"firmwareFilePath"`
-	Stdout           string    `firestore:"stdout"`
-	Stderr           string    `firestore:"stderr"`
-	ParametersJson   string    `firestore:"parametersJson"`
-	CreatedAt        time.Time `firestore:"createdAt"`
-	UpdatedAt        time.Time `firestore:"updatedAt"`
-}
-
-type Firmware struct {
-	KeyboardDefinitionId string    `firestore:"keyboardDefinitionId"`
-	Uid                  string    `firestore:"uid"`
-	Enabled              bool      `firestore:"enabled"`
-	QmkFirmwareVersion   string    `firestore:"qmkFirmwareVersion"`
-	CreatedAt            time.Time `firestore:"createdAt"`
-	UpdatedAt            time.Time `firestore:"updatedAt"`
-}
-
-type FirmwareFile struct {
-	ID      string `firestore:"-"`
-	Path    string `firestore:"path"`
-	Content string `firestore:"content"`
-}
-
 // FetchTaskInfo fetches the task information from the Firestore.
-func FetchTaskInfo(client *firestore.Client, params *web.RequestParameters) (*Task, error) {
+func FetchTaskInfo(client *firestore.Client, params *common.RequestParameters) (*common.Task, error) {
 	log.Println("Fetching the task information from the Firestore.")
 	taskDoc, err := client.Collection("build").Doc("v1").Collection("tasks").Doc(params.TaskId).Get(context.Background())
 	if err != nil {
@@ -49,13 +23,13 @@ func FetchTaskInfo(client *firestore.Client, params *web.RequestParameters) (*Ta
 		}
 		return nil, err
 	}
-	var task Task
+	var task common.Task
 	taskDoc.DataTo(&task)
 	return &task, nil
 }
 
 // FetchFirmwareInfo fetches the firmware information from the Firestore.
-func FetchFirmwareInfo(client *firestore.Client, task *Task) (*Firmware, error) {
+func FetchFirmwareInfo(client *firestore.Client, task *common.Task) (*common.Firmware, error) {
 	log.Println("Fetching the firmware information from the Firestore.")
 	firmwareDoc, err := client.Collection("build").Doc("v1").Collection("firmwares").Doc(task.FirmwareId).Get(context.Background())
 	if err != nil {
@@ -64,16 +38,16 @@ func FetchFirmwareInfo(client *firestore.Client, task *Task) (*Firmware, error) 
 		}
 		return nil, err
 	}
-	var firmware Firmware
+	var firmware common.Firmware
 	firmwareDoc.DataTo(&firmware)
 	return &firmware, nil
 }
 
 // FetchKeyboardFiles fetches the keyboard files from the Firestore.
-func FetchKeyboardFiles(client *firestore.Client, firmwareId string) ([]*FirmwareFile, error) {
+func FetchKeyboardFiles(client *firestore.Client, firmwareId string) ([]*common.FirmwareFile, error) {
 	log.Println("Fetching the keyboard files from the Firestore.")
 	iter := client.Collection("build").Doc("v1").Collection("firmwares").Doc(firmwareId).Collection("keyboardFiles").Documents(context.Background())
-	var keyboardFiles []*FirmwareFile
+	var keyboardFiles []*common.FirmwareFile
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -82,7 +56,7 @@ func FetchKeyboardFiles(client *firestore.Client, firmwareId string) ([]*Firmwar
 		if err != nil {
 			return nil, err
 		}
-		var keyboardFile FirmwareFile
+		var keyboardFile common.FirmwareFile
 		doc.DataTo(&keyboardFile)
 		keyboardFile.ID = doc.Ref.ID
 		keyboardFiles = append(keyboardFiles, &keyboardFile)
@@ -91,10 +65,10 @@ func FetchKeyboardFiles(client *firestore.Client, firmwareId string) ([]*Firmwar
 }
 
 // FetchKeymapFiles fetches the keymap files from the Firestore.
-func FetchKeymapFiles(client *firestore.Client, firmwareId string) ([]*FirmwareFile, error) {
+func FetchKeymapFiles(client *firestore.Client, firmwareId string) ([]*common.FirmwareFile, error) {
 	log.Println("Fetching the keymap files from the Firestore.")
 	iter := client.Collection("build").Doc("v1").Collection("firmwares").Doc(firmwareId).Collection("keymapFiles").Documents(context.Background())
-	var keymapFiles []*FirmwareFile
+	var keymapFiles []*common.FirmwareFile
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -103,7 +77,7 @@ func FetchKeymapFiles(client *firestore.Client, firmwareId string) ([]*FirmwareF
 		if err != nil {
 			return nil, err
 		}
-		var keymapFile FirmwareFile
+		var keymapFile common.FirmwareFile
 		doc.DataTo(&keymapFile)
 		keymapFile.ID = doc.Ref.ID
 		keymapFiles = append(keymapFiles, &keymapFile)
@@ -125,4 +99,67 @@ func UpdateTask(ctx context.Context, client *firestore.Client, taskId string, st
 		"updatedAt":        time.Now(),
 	}, firestore.MergeAll)
 	return err
+}
+
+func FetchCertificate(ctx context.Context, client *firestore.Client, key string) (*common.Certificate, error) {
+	iter := client.Collection("certifications").Where("domain", "==", key).Documents(ctx)
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
+			return nil, err
+		}
+		var certificate common.Certificate
+		doc.DataTo(&certificate)
+		certificate.ID = doc.Ref.ID
+		log.Printf("[Info] Found the certificate from the Firestore: %v", certificate.ID)
+		return &certificate, nil
+	}
+	log.Printf("[Info] Certificate not found: %v", key)
+	return nil, nil
+}
+
+func SaveCertificate(ctx context.Context, client *firestore.Client, key string, data []byte) error {
+	certificate, err := FetchCertificate(ctx, client, key)
+	if err != nil {
+		log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
+		return err
+	}
+	log.Printf("[Info] Saving the certificate to the Firestore: %v", key)
+	if certificate == nil {
+		_, _, err := client.Collection("certifications").Add(ctx, common.Certificate{Domain: key, Data: data})
+		if err != nil {
+			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
+			return err
+		}
+	} else {
+		_, err := client.Collection("certifications").Doc(certificate.ID).Set(ctx, common.Certificate{Domain: key, Data: data})
+		if err != nil {
+			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
+			return err
+		}
+	}
+	log.Printf("[Info] Saved the certificate to the Firestore: %v", key)
+	return nil
+}
+
+func DeleteCertificate(ctx context.Context, client *firestore.Client, key string) error {
+	certificate, err := FetchCertificate(ctx, client, key)
+	if err != nil {
+		log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
+		return err
+	}
+	if certificate == nil {
+		return fmt.Errorf("certificate not found")
+	}
+	_, err = client.Collection("certifications").Doc(certificate.ID).Delete(ctx)
+	if err != nil {
+		log.Printf("[Error] Failed to delete the certificate from the Firestore: %v", err)
+		return err
+	}
+	log.Printf("[Info] Deleted the certificate from the Firestore: %v", key)
+	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"remap-keys.app/remap-build-server/database"
+	"remap-keys.app/remap-build-server/common"
 )
 
 // QmkFirmwareBaseDirectoryPath is QMK Firmware base directory path.
@@ -40,7 +40,7 @@ func createFile(path string, content string) error {
 }
 
 // CreateFirmwareFiles creates the firmware files.
-func CreateFirmwareFiles(baseDirectoryPath string, firmwareFiles []*database.FirmwareFile) error {
+func CreateFirmwareFiles(baseDirectoryPath string, firmwareFiles []*common.FirmwareFile) error {
 	for _, firmwareFile := range firmwareFiles {
 		// If the path of the keyboardFile includes the directory divided by the "/" character,
 		// create the directory, then create the file.

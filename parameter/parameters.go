@@ -2,7 +2,7 @@ package parameter
 
 import (
 	"regexp"
-	"remap-keys.app/remap-build-server/database"
+	"remap-keys.app/remap-build-server/common"
 )
 
 func ReplaceParametersInString(input string, replacements map[string]string) string {
@@ -23,7 +23,7 @@ func ReplaceParametersInString(input string, replacements map[string]string) str
 }
 
 // ReplaceParameters replaces the parameters in the keyboard files.
-func ReplaceParameters(files []*database.FirmwareFile, parameterFileMap map[string]map[string]string) []*database.FirmwareFile {
+func ReplaceParameters(files []*common.FirmwareFile, parameterFileMap map[string]map[string]string) []*common.FirmwareFile {
 	for _, file := range files {
 		parameterMap := parameterFileMap[file.ID]
 		if parameterMap == nil {

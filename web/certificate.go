@@ -3,7 +3,9 @@ package web
 import (
 	"cloud.google.com/go/firestore"
 	"context"
-	"fmt"
+	"golang.org/x/crypto/acme/autocert"
+	"log"
+	"remap-keys.app/remap-build-server/database"
 )
 
 type FirestoreCertCache struct {
@@ -15,28 +17,33 @@ func NewFirestoreCertCache(client *firestore.Client) *FirestoreCertCache {
 		client: client,
 	}
 }
+
 func (fc *FirestoreCertCache) Get(ctx context.Context, key string) ([]byte, error) {
-	doc, err := fc.client.Collection("certifications").Doc(key).Get(ctx)
+	certificate, err := database.FetchCertificate(ctx, fc.client, key)
 	if err != nil {
+		log.Printf("Failed to fetch the certificate from the Firestore: %v", err)
 		return nil, err
 	}
-
-	data, ok := doc.Data()["data"].([]byte)
-	if !ok {
-		return nil, fmt.Errorf("data not found or is not a byte slice")
+	if certificate == nil {
+		return nil, autocert.ErrCacheMiss
 	}
-
-	return data, nil
+	return certificate.Data, nil
 }
 
 func (fc *FirestoreCertCache) Put(ctx context.Context, key string, data []byte) error {
-	_, err := fc.client.Collection("certifications").Doc(key).Set(ctx, map[string]interface{}{
-		"data": data,
-	})
-	return err
+	err := database.SaveCertificate(ctx, fc.client, key, data)
+	if err != nil {
+		log.Printf("Failed to save the certificate to the Firestore: %v", err)
+		return err
+	}
+	return nil
 }
 
 func (fc *FirestoreCertCache) Delete(ctx context.Context, key string) error {
-	_, err := fc.client.Collection("certifications").Doc(key).Delete(ctx)
-	return err
+	err := database.DeleteCertificate(ctx, fc.client, key)
+	if err != nil {
+		log.Printf("Failed to delete the certificate from the Firestore: %v", err)
+		return err
+	}
+	return nil
 }

@@ -26,6 +26,7 @@ COPY ./build/*.go ./build/
 COPY ./database/*.go ./database/
 COPY ./parameter/*.go ./parameter/
 COPY ./web/*.go ./web/
+COPY ./common/*.go ./common/
 # RUN go test -v ./...
 RUN go build -mod=readonly -v -o server
 
