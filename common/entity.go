@@ -17,12 +17,13 @@ type Task struct {
 }
 
 type Firmware struct {
-	KeyboardDefinitionId string    `firestore:"keyboardDefinitionId"`
-	Uid                  string    `firestore:"uid"`
-	Enabled              bool      `firestore:"enabled"`
-	QmkFirmwareVersion   string    `firestore:"qmkFirmwareVersion"`
-	CreatedAt            time.Time `firestore:"createdAt"`
-	UpdatedAt            time.Time `firestore:"updatedAt"`
+	KeyboardDefinitionId  string    `firestore:"keyboardDefinitionId"`
+	Uid                   string    `firestore:"uid"`
+	Enabled               bool      `firestore:"enabled"`
+	QmkFirmwareVersion    string    `firestore:"qmkFirmwareVersion"`
+	KeyboardDirectoryName string    `firestore:"keyboardDirectoryName"`
+	CreatedAt             time.Time `firestore:"createdAt"`
+	UpdatedAt             time.Time `firestore:"updatedAt"`
 }
 
 type FirmwareFile struct {

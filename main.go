@@ -199,7 +199,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	keymapFiles = parameter.ReplaceParameters(keymapFiles, parameters.Keymap)
 
 	// Generate the keyboard ID.
-	keyboardId := build.GenerateKeyboardId()
+	keyboardId := build.GenerateKeyboardId(firmware)
 	log.Printf("[INFO] keyboardId: %s\n", keyboardId)
 
 	// Prepare the keyboard directory.
