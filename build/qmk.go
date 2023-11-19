@@ -21,7 +21,12 @@ type BuildResult struct {
 }
 
 // GenerateKeyboardId generates the keyboard ID.
-func GenerateKeyboardId() string {
+// If the passed firmware info has the keyboard directory name, use it.
+// Otherwise, generate the keyboard ID.
+func GenerateKeyboardId(firmware *common.Firmware) string {
+	if firmware.KeyboardDirectoryName != "" {
+		return firmware.KeyboardDirectoryName
+	}
 	guid := xid.New()
 	return guid.String()
 }
