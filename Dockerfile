@@ -17,6 +17,8 @@ RUN python3 -m pip install --user qmk
 
 RUN mkdir -p /root/versions/0.22.14
 RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
+RUN rm -rf /root/versions/0.22.14/keyboards/*
+RUN echo "{}" > /root/versions/0.22.14/data/mappings/keyboard_aliases.hjson
 
 COPY go.* ./
 RUN go mod download

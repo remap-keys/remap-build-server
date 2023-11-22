@@ -8,6 +8,7 @@ import (
 	"firebase.google.com/go/storage"
 	"fmt"
 	"golang.org/x/crypto/acme/autocert"
+	"google.golang.org/api/option"
 	"io"
 	"log"
 	"net/http"
@@ -63,12 +64,22 @@ func main() {
 
 	log.Printf("[Info] Listening on port 443")
 	log.Fatal(server.ListenAndServeTLS("", ""))
+
+	//port := "8080"
+	//h := func(w http.ResponseWriter, r *http.Request) {
+	//	handleRequest(w, r, ctx, firestoreClient, storageClient)
+	//}
+	//http.HandleFunc("/build", h)
+	//log.Printf("Remap Build Server is running on port %s.\n", port)
+	//if err := http.ListenAndServe(":"+port, nil); err != nil {
+	//	log.Fatal(err)
+	//}
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
-	//sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
-	//app, err := firebase.NewApp(ctx, nil, sa)
-	app, err := firebase.NewApp(ctx, nil)
+	sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
+	app, err := firebase.NewApp(ctx, nil, sa)
+	//app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -260,7 +271,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	log.Printf("[INFO] localFirmwareFilePath: %s\n", localFirmwareFilePath)
 
 	// Upload the firmware file to the Cloud Storage.
-	remoteFirmwareFilePath, err := database.UploadFirmwareFileToCloudStorage(ctx, storageClient, params.Uid, firmwareFileName, localFirmwareFilePath)
+	firmwareFileNameWithTimestamp := build.CreateFirmwareFileNameWithTimestamp(firmwareFileName)
+	remoteFirmwareFilePath, err := database.UploadFirmwareFileToCloudStorage(ctx, storageClient, params.Uid, firmwareFileNameWithTimestamp, localFirmwareFilePath)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
