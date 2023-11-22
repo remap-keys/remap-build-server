@@ -8,7 +8,6 @@ import (
 	"firebase.google.com/go/storage"
 	"fmt"
 	"golang.org/x/crypto/acme/autocert"
-	"google.golang.org/api/option"
 	"io"
 	"log"
 	"net/http"
@@ -77,9 +76,9 @@ func main() {
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
-	sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
-	app, err := firebase.NewApp(ctx, nil, sa)
-	//app, err := firebase.NewApp(ctx, nil)
+	//sa := option.WithCredentialsFile("service-account-remap-b2d08-70b4596e8a05.json")
+	//app, err := firebase.NewApp(ctx, nil, sa)
+	app, err := firebase.NewApp(ctx, nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
