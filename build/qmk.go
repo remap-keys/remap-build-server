@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"remap-keys.app/remap-build-server/common"
+	"strconv"
+	"time"
 )
 
 // QmkFirmwareBaseDirectoryPath is QMK Firmware base directory path.
@@ -133,4 +135,22 @@ func PrepareKeyboardDirectory(keyboardId string, qmkFirmwareVersion string) (str
 		return "", err
 	}
 	return keyboardDirectoryFullPath, nil
+}
+
+// CreateFirmwareFileNameWithTimestamp creates a firmware file name with timestamp.
+// This function does the following:
+//  1. Create the timestamp string based on the epoch.
+//  2. Append the timestamp string after the firmware file name with the "_" character.
+//     For instance, "ckpr5gut7qls715olr70_remap.uf2" -> "ckpr5gut7qls715olr70_remap_1580000000.uf2"
+//  3. Return the firmware file name with the timestamp.
+func CreateFirmwareFileNameWithTimestamp(firmwareFileName string) string {
+	if firmwareFileName == "" {
+		return ""
+	}
+	epoch := strconv.FormatInt(time.Now().Unix(), 10)
+	return firmwareFileName[:len(firmwareFileName)-len(filepath.Ext(firmwareFileName))] + "_" + epoch + filepath.Ext(firmwareFileName)
+}
+
+func CreateFirmwareFilePath(qmkFirmwareBaseDirectoryPath string, qmkFirmwareVersion string, firmwareFileName string) string {
+	return filepath.Join(qmkFirmwareBaseDirectoryPath+qmkFirmwareVersion, CreateFirmwareFileNameWithTimestamp(firmwareFileName))
 }
