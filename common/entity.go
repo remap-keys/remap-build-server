@@ -49,9 +49,9 @@ type ParametersJsonVersion1 struct {
 }
 
 type ParametersJson struct {
-	Version  int8                      `json:"version"`
-	Keyboard map[string]ParameterValue `json:"keyboard"`
-	Keymap   map[string]ParameterValue `json:"keymap"`
+	Version  int8                       `json:"version"`
+	Keyboard map[string]*ParameterValue `json:"keyboard"`
+	Keymap   map[string]*ParameterValue `json:"keymap"`
 }
 
 type ParameterValue struct {

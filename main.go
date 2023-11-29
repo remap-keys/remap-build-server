@@ -3,7 +3,6 @@ package main
 import (
 	"cloud.google.com/go/firestore"
 	"context"
-	"encoding/json"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	"path/filepath"
 	"remap-keys.app/remap-build-server/auth"
 	"remap-keys.app/remap-build-server/build"
-	"remap-keys.app/remap-build-server/common"
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
@@ -156,8 +154,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}
 
 	// Parse the parameters JSON string.
-	var parameters common.ParametersJsonVersion1
-	err = json.Unmarshal([]byte(task.ParametersJson), &parameters)
+	parametersJson, err := parameter.ParseParameterJson(task.ParametersJson)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
@@ -201,8 +198,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	log.Printf("[INFO] keymapFiles: %+v\n", keymapFiles)
 
 	// Replace parameters.
-	keyboardFiles = parameter.ReplaceParameters(keyboardFiles, parameters.Keyboard)
-	keymapFiles = parameter.ReplaceParameters(keymapFiles, parameters.Keymap)
+	keyboardFiles = parameter.ReplaceParameters(keyboardFiles, parametersJson.Keyboard)
+	keymapFiles = parameter.ReplaceParameters(keymapFiles, parametersJson.Keymap)
 
 	// Generate the keyboard ID.
 	keyboardId := build.GenerateKeyboardId(firmware)

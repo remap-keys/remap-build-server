@@ -183,7 +183,7 @@ func Test_ParseParameterJson_Version2(t *testing.T) {
 	if actual.Keymap["file2"].Type != "code" {
 		t.Error("Expected code but got", actual.Keymap["file2"].Type)
 	}
-	if len(actual.Keyboard["file2"].Parameters) != 0 {
+	if len(actual.Keymap["file2"].Parameters) != 0 {
 		t.Error("Expected 0 but got", len(actual.Keyboard["file2"].Parameters))
 	}
 	if actual.Keymap["file2"].Code != "code2" {
