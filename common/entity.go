@@ -42,3 +42,20 @@ type RequestParameters struct {
 	Uid    string
 	TaskId string
 }
+
+type ParametersJsonVersion1 struct {
+	Keyboard map[string]map[string]string `json:"keyboard"`
+	Keymap   map[string]map[string]string `json:"keymap"`
+}
+
+type ParametersJson struct {
+	Version  int8                      `json:"version"`
+	Keyboard map[string]ParameterValue `json:"keyboard"`
+	Keymap   map[string]ParameterValue `json:"keymap"`
+}
+
+type ParameterValue struct {
+	Type       string            `json:"type"`
+	Parameters map[string]string `json:"parameters"`
+	Code       string            `json:"code"`
+}

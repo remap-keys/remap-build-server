@@ -15,15 +15,11 @@ import (
 	"path/filepath"
 	"remap-keys.app/remap-build-server/auth"
 	"remap-keys.app/remap-build-server/build"
+	"remap-keys.app/remap-build-server/common"
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
 )
-
-type Parameters struct {
-	Keyboard map[string]map[string]string `json:"keyboard"`
-	Keymap   map[string]map[string]string `json:"keymap"`
-}
 
 func main() {
 	// Prepare the Firestore firestoreClient.
@@ -160,7 +156,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}
 
 	// Parse the parameters JSON string.
-	var parameters Parameters
+	var parameters common.ParametersJsonVersion1
 	err = json.Unmarshal([]byte(task.ParametersJson), &parameters)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
