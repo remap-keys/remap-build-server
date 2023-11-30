@@ -91,3 +91,102 @@ qux`
 		t.Error("Expected", expected, "but got", actual)
 	}
 }
+
+func Test_ParseParameterJson_EmptySource(t *testing.T) {
+	_, err := ParseParameterJson("")
+	if err == nil {
+		t.Error("Expected error but got nil")
+	}
+}
+
+func Test_ParseParameterJson_InvalidJson(t *testing.T) {
+	_, err := ParseParameterJson("foo")
+	if err == nil {
+		t.Error("Expected error but got nil")
+	}
+}
+
+func Test_ParseParameterJson_Version1(t *testing.T) {
+	json := `{
+				"keyboard": {
+					"file1": {
+						"name1": "value1"
+					}
+				},
+				"keymap": {
+					"file2": {
+						"name2": "value2"
+					}
+				}
+			}`
+	actual, err := ParseParameterJson(json)
+	if err != nil {
+		t.Error("Expected nil but got", err)
+	}
+	if actual.Version != 1 {
+		t.Error("Expected 1 but got", actual.Version)
+	}
+	if actual.Keyboard["file1"].Type != "parameters" {
+		t.Error("Expected parameters but got", actual.Keyboard["file1"].Type)
+	}
+	if actual.Keyboard["file1"].Parameters["name1"] != "value1" {
+		t.Error("Expected value1 but got", actual.Keyboard["file1"].Parameters["name1"])
+	}
+	if actual.Keyboard["file1"].Code != "" {
+		t.Error("Expected empty string but got", actual.Keyboard["file1"].Code)
+	}
+	if actual.Keymap["file2"].Type != "parameters" {
+		t.Error("Expected parameters but got", actual.Keymap["file2"].Type)
+	}
+	if actual.Keymap["file2"].Parameters["name2"] != "value2" {
+		t.Error("Expected value2 but got", actual.Keymap["file2"].Parameters["name2"])
+	}
+	if actual.Keymap["file2"].Code != "" {
+		t.Error("Expected empty string but got", actual.Keymap["file2"].Code)
+	}
+}
+
+func Test_ParseParameterJson_Version2(t *testing.T) {
+	json := `{
+				"version": 2,
+				"keyboard": {
+					"file1": {
+						"type": "parameters",
+						"parameters": {
+							"name1": "value1"
+						}
+					}
+				},
+				"keymap": {
+					"file2": {
+						"type": "code",
+						"code": "code2"
+					}
+				}
+			}`
+	actual, err := ParseParameterJson(json)
+	if err != nil {
+		t.Error("Expected nil but got", err)
+	}
+	if actual.Version != 2 {
+		t.Error("Expected 2 but got", actual.Version)
+	}
+	if actual.Keyboard["file1"].Type != "parameters" {
+		t.Error("Expected parameters but got", actual.Keyboard["file1"].Type)
+	}
+	if actual.Keyboard["file1"].Parameters["name1"] != "value1" {
+		t.Error("Expected value1 but got", actual.Keyboard["file1"].Parameters["name1"])
+	}
+	if actual.Keyboard["file1"].Code != "" {
+		t.Error("Expected empty string but got", actual.Keyboard["file1"].Code)
+	}
+	if actual.Keymap["file2"].Type != "code" {
+		t.Error("Expected code but got", actual.Keymap["file2"].Type)
+	}
+	if len(actual.Keymap["file2"].Parameters) != 0 {
+		t.Error("Expected 0 but got", len(actual.Keyboard["file2"].Parameters))
+	}
+	if actual.Keymap["file2"].Code != "code2" {
+		t.Error("Expected code2 but got", actual.Keymap["file2"].Code)
+	}
+}
