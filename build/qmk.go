@@ -81,6 +81,8 @@ func BuildQmkFirmware(keyboardId string, qmkFirmwareVersion string) BuildResult 
 		"-kb", keyboardId,
 		"-km", "remap")
 	cmd.Dir = "/root/versions/" + qmkFirmwareVersion
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, "OPT_DEFS=-DBUILD_ON_REMAP")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout
