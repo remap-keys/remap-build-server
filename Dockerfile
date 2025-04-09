@@ -13,12 +13,19 @@ WORKDIR /app
 ENV HOME /root
 ENV PATH=$HOME/.local/bin:$PATH
 
+RUN python3 -m pip install --upgrade pip
+
 RUN python3 -m pip install --user qmk
 
 RUN mkdir -p /root/versions/0.22.14
 RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
 RUN rm -rf /root/versions/0.22.14/keyboards/*
 RUN echo "{}" > /root/versions/0.22.14/data/mappings/keyboard_aliases.hjson
+
+RUN mkdir -p /root/versions/0.28.3
+RUN qmk setup --yes --home /root/versions/0.28.3 --branch 0.28.3
+RUN rm -rf /root/versions/0.28.3/keyboards/*
+RUN echo "{}" > /root/versions/0.28.3/data/mappings/keyboard_aliases.hjson
 
 COPY go.* ./
 RUN go mod download
@@ -33,7 +40,7 @@ COPY ./common/*.go ./common/
 RUN go build -mod=readonly -v -o server
 
 # For local development environment only
-#COPY service-account-remap-b2d08-70b4596e8a05.json ./
+# COPY service-account-remap-b2d08-70b4596e8a05.json ./
 
 # EXPOSE 8088
 
