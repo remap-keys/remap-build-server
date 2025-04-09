@@ -40,7 +40,7 @@ COPY ./common/*.go ./common/
 RUN go build -mod=readonly -v -o server
 
 # For local development environment only
-COPY service-account-remap-b2d08-70b4596e8a05.json ./
+# COPY service-account-remap-b2d08-70b4596e8a05.json ./
 
 # EXPOSE 8088
 
