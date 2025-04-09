@@ -21,6 +21,7 @@ RUN mkdir -p /root/versions/0.22.14
 RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
 RUN rm -rf /root/versions/0.22.14/keyboards/*
 RUN echo "{}" > /root/versions/0.22.14/data/mappings/keyboard_aliases.hjson
+RUN python3 -m pip install -r /root/versions/0.22.14/requirements.txt
 
 RUN mkdir -p /root/versions/0.28.3
 RUN qmk setup --yes --home /root/versions/0.28.3 --branch 0.28.3
