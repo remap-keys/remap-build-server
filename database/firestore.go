@@ -1,16 +1,17 @@
 package database
 
 import (
-	"cloud.google.com/go/firestore"
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
+	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"log"
 	"remap-keys.app/remap-build-server/common"
-	"time"
 )
 
 // FetchTaskInfo fetches the task information from the Firestore.
@@ -162,4 +163,61 @@ func DeleteCertificate(ctx context.Context, client *firestore.Client, key string
 	}
 	log.Printf("[Info] Deleted the certificate from the Firestore: %v", key)
 	return nil
+}
+
+// FetchWorkbenchProjectInfo fetches the workbench project information from the Firestore.
+func FetchWorkbenchProjectInfo(client *firestore.Client, task *common.Task) (*common.WorkbenchProject, error) {
+	log.Println("Fetching the workbench project information from the Firestore.")
+	projectDoc, err := client.Collection("build").Doc("v1").Collection("projects").Doc(task.ProjectId).Get(context.Background())
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, fmt.Errorf("project not found")
+		}
+		return nil, err
+	}
+	var project common.WorkbenchProject
+	projectDoc.DataTo(&project)
+	return &project, nil
+}
+
+// FetchWorkbenchProjectKeyboardFiles fetches the keyboard files from the Firestore.
+func FetchWorkbenchKeyboardFiles(client *firestore.Client, projectId string) ([]*common.WorkbenchProjectFile, error) {
+	log.Println("Fetching the workbench keyboard files from the Firestore.")
+	iter := client.Collection("build").Doc("v1").Collection("projects").Doc(projectId).Collection("keyboardFiles").Documents(context.Background())
+	var keyboardFiles []*common.WorkbenchProjectFile
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var keyboardFile common.WorkbenchProjectFile
+		doc.DataTo(&keyboardFile)
+		keyboardFile.ID = doc.Ref.ID
+		keyboardFiles = append(keyboardFiles, &keyboardFile)
+	}
+	return keyboardFiles, nil
+}
+
+// FetchWorkbenchKeymapFiles fetches the keymap files from the Firestore.
+func FetchWorkbenchKeymapFiles(client *firestore.Client, projectId string) ([]*common.WorkbenchProjectFile, error) {
+	log.Println("Fetching the workbench keymap files from the Firestore.")
+	iter := client.Collection("build").Doc("v1").Collection("projects").Doc(projectId).Collection("keymapFiles").Documents(context.Background())
+	var keymapFiles []*common.WorkbenchProjectFile
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var keymapFile common.WorkbenchProjectFile
+		doc.DataTo(&keymapFile)
+		keymapFile.ID = doc.Ref.ID
+		keymapFiles = append(keymapFiles, &keymapFile)
+	}
+	return keymapFiles, nil
 }

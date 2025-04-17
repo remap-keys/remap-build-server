@@ -1,19 +1,21 @@
 package main
 
 import (
-	"cloud.google.com/go/firestore"
 	"context"
-	firebase "firebase.google.com/go"
-	"firebase.google.com/go/storage"
 	"fmt"
-	"golang.org/x/crypto/acme/autocert"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"cloud.google.com/go/firestore"
+	firebase "firebase.google.com/go"
+	"firebase.google.com/go/storage"
+	"golang.org/x/crypto/acme/autocert"
 	"remap-keys.app/remap-build-server/auth"
 	"remap-keys.app/remap-build-server/build"
+	"remap-keys.app/remap-build-server/common"
 	"remap-keys.app/remap-build-server/database"
 	"remap-keys.app/remap-build-server/parameter"
 	"remap-keys.app/remap-build-server/web"
@@ -153,15 +155,19 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 		return
 	}
 
+	if task.FirmwareId != "" {
+		buildFirmwareWithRegisteredSourceFiles(ctx, firestoreClient, storageClient, w, task, params)
+	} else if task.ProjectId != "" {
+		buildFirmwareWithWorkbenchSourceFiles(ctx, firestoreClient, storageClient, w, task, params)
+	} else {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, fmt.Errorf("the task does not have firmwareId or projectId"))
+	}
+}
+
+// Build a firmware file for a registerd source files by each keyboard owner.
+func buildFirmwareWithRegisteredSourceFiles(ctx context.Context, firestoreClient *firestore.Client, storageClient *storage.Client, w http.ResponseWriter, task *common.Task, params *common.RequestParameters) {
 	// Parse the parameters JSON string.
 	parametersJson, err := parameter.ParseParameterJson(task.ParametersJson)
-	if err != nil {
-		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
-		return
-	}
-
-	// Update the task status to "building".
-	err = database.UpdateTaskStatusToBuilding(ctx, firestoreClient, params.TaskId)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
@@ -178,6 +184,13 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	// Check whether the firmware is enabled.
 	if !firmware.Enabled {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, fmt.Errorf("the firmware is not enabled"))
+		return
+	}
+
+	// Update the task status to "building".
+	err = database.UpdateTaskStatusToBuilding(ctx, firestoreClient, params.TaskId)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
 
@@ -202,7 +215,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	keymapFiles = parameter.ReplaceParameters(keymapFiles, parametersJson.Keymap)
 
 	// Generate the keyboard ID.
-	keyboardId := build.GenerateKeyboardId(firmware)
+	keyboardId := build.GenerateKeyboardId(firmware.KeyboardDirectoryName)
 	log.Printf("[INFO] keyboardId: %s\n", keyboardId)
 
 	// Prepare the keyboard directory.
@@ -224,7 +237,11 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}()
 
 	// Create the keyboard files.
-	err = build.CreateFirmwareFiles(keyboardDirectoryPath, keyboardFiles)
+	buildableKeyboardFiles := make([]common.BuildableFile, len(keyboardFiles))
+	for i, file := range keyboardFiles {
+		buildableKeyboardFiles[i] = file
+	}
+	err = build.CreateFiles(keyboardDirectoryPath, buildableKeyboardFiles)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
@@ -237,7 +254,11 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
 	}
-	err = build.CreateFirmwareFiles(keymapDirectoryPath, keymapFiles)
+	buildableKeymapFiles := make([]common.BuildableFile, len(keymapFiles))
+	for i, file := range keymapFiles {
+		buildableKeymapFiles[i] = file
+	}
+	err = build.CreateFiles(keymapDirectoryPath, buildableKeymapFiles)
 	if err != nil {
 		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
 		return
@@ -260,6 +281,124 @@ func handleRequest(w http.ResponseWriter, r *http.Request, ctx context.Context, 
 	}
 	localFirmwareFilePath := filepath.Join(
 		build.QmkFirmwareBaseDirectoryPath+firmware.QmkFirmwareVersion, firmwareFileName)
+	log.Printf("[INFO] localFirmwareFilePath: %s\n", localFirmwareFilePath)
+
+	// Upload the firmware file to the Cloud Storage.
+	firmwareFileNameWithTimestamp := build.CreateFirmwareFileNameWithTimestamp(firmwareFileName)
+	remoteFirmwareFilePath, err := database.UploadFirmwareFileToCloudStorage(ctx, storageClient, params.Uid, firmwareFileNameWithTimestamp, localFirmwareFilePath)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	log.Printf("[INFO] remoteFirmwareFilePath: %s\n", remoteFirmwareFilePath)
+
+	// Update the task status to "success".
+	err = sendSuccessResponseWithStdout(ctx, params.TaskId, firestoreClient, w, buildResult.Stdout, remoteFirmwareFilePath)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+	}
+}
+
+// Build a firmware file for a created source files with Workbench feature.
+func buildFirmwareWithWorkbenchSourceFiles(ctx context.Context, firestoreClient *firestore.Client, storageClient *storage.Client, w http.ResponseWriter, task *common.Task, params *common.RequestParameters) {
+	// Fetch the workbench project information from the Firestore.
+	project, err := database.FetchWorkbenchProjectInfo(firestoreClient, task)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	log.Printf("[INFO] The workbench project [%+v] exists.\n", task.ProjectId)
+
+	// Update the task status to "building".
+	err = database.UpdateTaskStatusToBuilding(ctx, firestoreClient, params.TaskId)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+
+	// Fetch the workbench keyboard files from the Firestore.
+	keyboardFiles, err := database.FetchWorkbenchKeyboardFiles(firestoreClient, task.ProjectId)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	log.Printf("[INFO] keyboardFiles: %+v\n", keyboardFiles)
+
+	// Fetch the workbench keymap files from the Firestore.
+	keymapFiles, err := database.FetchWorkbenchKeymapFiles(firestoreClient, task.ProjectId)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	log.Printf("[INFO] keymapFiles: %+v\n", keymapFiles)
+
+	// Generate the keyboard ID.
+	keyboardId := build.GenerateKeyboardId(project.KeyboardDirectoryName)
+	log.Printf("[INFO] keyboardId: %s\n", keyboardId)
+
+	// Prepare the keyboard directory.
+	keyboardDirectoryPath, err := build.PrepareKeyboardDirectory(keyboardId, project.QmkFirmwareVersion)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	log.Printf("[INFO] Keyboard directory path: %s\n", keyboardDirectoryPath)
+
+	// Delete the keyboard directory after the function returns.
+	defer func() {
+		// Delete the keyboard directory.
+		err = build.DeleteKeyboardDirectory(keyboardId, project.QmkFirmwareVersion)
+		if err != nil {
+			log.Printf("[ERROR] %s\n", err.Error())
+		}
+		log.Printf("[INFO] Deleted the keyboard directory: %s\n", keyboardDirectoryPath)
+	}()
+
+	// Create the keyboard files.
+	buildableKeyboardFiles := make([]common.BuildableFile, len(keyboardFiles))
+	for i, file := range keyboardFiles {
+		buildableKeyboardFiles[i] = file
+	}
+	err = build.CreateFiles(keyboardDirectoryPath, buildableKeyboardFiles)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+
+	// Create the keymap files.
+	keymapDirectoryPath := filepath.Join(keyboardDirectoryPath, "keymaps", "remap")
+	err = os.MkdirAll(keymapDirectoryPath, 0755)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	buildableKeymapFiles := make([]common.BuildableFile, len(keymapFiles))
+	for i, file := range keymapFiles {
+		buildableKeymapFiles[i] = file
+	}
+	err = build.CreateFiles(keymapDirectoryPath, buildableKeymapFiles)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+
+	// Build the QMK Firmware.
+	buildResult := build.BuildQmkFirmware(keyboardId, project.QmkFirmwareVersion)
+	log.Printf("[INFO] buildResult: %v\n", buildResult.Success)
+	if !buildResult.Success {
+		sendFailureResponseWithStdoutAndStderr(ctx, params.TaskId, firestoreClient, w, "Building failed", buildResult.Stdout, buildResult.Stderr)
+		return
+	}
+	log.Printf("[INFO] Building succeeded\n")
+
+	// Create the local firmware file path.
+	firmwareFileName, err := parameter.FetchFirmwareFileName(buildResult.Stdout)
+	if err != nil {
+		sendFailureResponseWithStdoutAndStderr(ctx, params.TaskId, firestoreClient, w, err.Error(), buildResult.Stdout, buildResult.Stderr)
+		return
+	}
+	localFirmwareFilePath := filepath.Join(
+		build.QmkFirmwareBaseDirectoryPath+project.QmkFirmwareVersion, firmwareFileName)
 	log.Printf("[INFO] localFirmwareFilePath: %s\n", localFirmwareFilePath)
 
 	// Upload the firmware file to the Cloud Storage.

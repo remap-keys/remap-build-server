@@ -8,6 +8,7 @@ type Task struct {
 	Uid              string    `firestore:"uid"`
 	Status           string    `firestore:"status"`
 	FirmwareId       string    `firestore:"firmwareId"`
+	ProjectId        string    `firestore:"projectId"`
 	FirmwareFilePath string    `firestore:"firmwareFilePath"`
 	Stdout           string    `firestore:"stdout"`
 	Stderr           string    `firestore:"stderr"`
@@ -26,10 +27,49 @@ type Firmware struct {
 	UpdatedAt             time.Time `firestore:"updatedAt"`
 }
 
+type WorkbenchProject struct {
+	Name                  string    `firestore:"name"`
+	QmkFirmwareVersion    string    `firestore:"qmkFirmwareVersion"`
+	Uid                   string    `firestore:"uid"`
+	KeyboardDirectoryName string    `firestore:"keyboardDirectoryName"`
+	CreatedAt             time.Time `firestore:"createdAt"`
+	UpdatedAt             time.Time `firestore:"updatedAt"`
+}
+
+type BuildableFile interface {
+	GetPath() string
+	GetContent() string
+}
+
 type FirmwareFile struct {
 	ID      string `firestore:"-"`
 	Path    string `firestore:"path"`
 	Content string `firestore:"content"`
+}
+
+func (f FirmwareFile) GetPath() string {
+	return f.Path
+}
+
+func (f FirmwareFile) GetContent() string {
+	return f.Content
+}
+
+type WorkbenchProjectFile struct {
+	ID        string    `firestore:"-"`
+	Path      string    `firestore:"path"`
+	Content   string    `firestore:"code"`
+	FileType  string    `firestore:"fileType"`
+	CreatedAt time.Time `firestore:"createdAt"`
+	UpdatedAt time.Time `firestore:"updatedAt"`
+}
+
+func (w WorkbenchProjectFile) GetPath() string {
+	return w.Path
+}
+
+func (w WorkbenchProjectFile) GetContent() string {
+	return w.Content
 }
 
 type Certificate struct {
