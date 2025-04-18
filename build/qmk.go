@@ -2,14 +2,15 @@ package build
 
 import (
 	"bytes"
-	"github.com/rs/xid"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"remap-keys.app/remap-build-server/common"
 	"strconv"
 	"time"
+
+	"github.com/rs/xid"
+	"remap-keys.app/remap-build-server/common"
 )
 
 // QmkFirmwareBaseDirectoryPath is QMK Firmware base directory path.
@@ -23,11 +24,11 @@ type BuildResult struct {
 }
 
 // GenerateKeyboardId generates the keyboard ID.
-// If the passed firmware info has the keyboard directory name, use it.
+// If the passed keyboard directory name is not empty string, use it.
 // Otherwise, generate the keyboard ID.
-func GenerateKeyboardId(firmware *common.Firmware) string {
-	if firmware.KeyboardDirectoryName != "" {
-		return firmware.KeyboardDirectoryName
+func GenerateKeyboardId(keyboardDirectoryName string) string {
+	if keyboardDirectoryName != "" {
+		return keyboardDirectoryName
 	}
 	guid := xid.New()
 	return guid.String()
@@ -46,13 +47,13 @@ func createFile(path string, content string) error {
 	return nil
 }
 
-// CreateFirmwareFiles creates the firmware files.
-func CreateFirmwareFiles(baseDirectoryPath string, firmwareFiles []*common.FirmwareFile) error {
-	for _, firmwareFile := range firmwareFiles {
+// CreateFiles creates the files.
+func CreateFiles(baseDirectoryPath string, buildableFiles []common.BuildableFile) error {
+	for _, buildableFile := range buildableFiles {
 		// If the path of the keyboardFile includes the directory divided by the "/" character,
 		// create the directory, then create the file.
 		// Otherwise, create the file.
-		dir, file := filepath.Split(firmwareFile.Path)
+		dir, file := filepath.Split(buildableFile.GetPath())
 		var targetDirectoryPath string
 		if dir != "" {
 			targetDirectoryPath = filepath.Join(baseDirectoryPath, dir)
@@ -65,7 +66,7 @@ func CreateFirmwareFiles(baseDirectoryPath string, firmwareFiles []*common.Firmw
 		}
 		targetFilePath := filepath.Join(targetDirectoryPath, file)
 		log.Printf("[INFO] targetFilePath: %s\n", targetFilePath)
-		err := createFile(targetFilePath, firmwareFile.Content)
+		err := createFile(targetFilePath, buildableFile.GetContent())
 		if err != nil {
 			return err
 		}
