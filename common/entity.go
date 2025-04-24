@@ -72,6 +72,13 @@ func (w WorkbenchProjectFile) GetContent() string {
 	return w.Content
 }
 
+type UserPurchase struct {
+	ID                  string    `firestore:"-"`
+	RemainingBuildCount int       `firestore:"remainingBuildCount"`
+	CreatedAt           time.Time `firestore:"createdAt"`
+	UpdatedAt           time.Time `firestore:"updatedAt"`
+}
+
 type Certificate struct {
 	ID     string `firestore:"-"`
 	Domain string `firestore:"domain"`

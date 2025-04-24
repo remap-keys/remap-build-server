@@ -301,6 +301,22 @@ func buildFirmwareWithRegisteredSourceFiles(ctx context.Context, firestoreClient
 
 // Build a firmware file for a created source files with Workbench feature.
 func buildFirmwareWithWorkbenchSourceFiles(ctx context.Context, firestoreClient *firestore.Client, storageClient *storage.Client, w http.ResponseWriter, task *common.Task, params *common.RequestParameters) {
+	// Check whether the remaining build count is greater than 0.
+	userPurchase, err := database.FetchUserPurchase(firestoreClient, params.Uid)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
+	if userPurchase.RemainingBuildCount <= 0 {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, fmt.Errorf("the user has no remaining build count"))
+		return
+	}
+	// Decrease the remaining build count by 1.
+	err = database.DecreaseRemainingBuildCount(firestoreClient, params.Uid)
+	if err != nil {
+		sendFailureResponseWithError(ctx, params.TaskId, firestoreClient, w, err)
+		return
+	}
 	// Fetch the workbench project information from the Firestore.
 	project, err := database.FetchWorkbenchProjectInfo(firestoreClient, task)
 	if err != nil {

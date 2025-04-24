@@ -221,3 +221,38 @@ func FetchWorkbenchKeymapFiles(client *firestore.Client, projectId string) ([]*c
 	}
 	return keymapFiles, nil
 }
+
+// FetchUserPurchase fetches the user purchase information from the Firestore.
+func FetchUserPurchase(client *firestore.Client, uid string) (*common.UserPurchase, error) {
+	log.Println("Fetching the user purchase information from the Firestore.")
+	purchaseDoc, err := client.Collection("users").Doc("v1").Collection("purchases").Doc(uid).Get(context.Background())
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, fmt.Errorf("purchase not found")
+		}
+		return nil, err
+	}
+	var purchase common.UserPurchase
+	purchaseDoc.DataTo(&purchase)
+	return &purchase, nil
+}
+
+// DecreaseRemainingBuildCount decreases the user purchase count in the Firestore.
+func DecreaseRemainingBuildCount(client *firestore.Client, uid string) error {
+	log.Println("Decreasing the user purchase count in the Firestore.")
+	purchaseDoc, err := client.Collection("users").Doc("v1").Collection("purchases").Doc(uid).Get(context.Background())
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return fmt.Errorf("purchase not found")
+		}
+		return err
+	}
+	var purchase common.UserPurchase
+	purchaseDoc.DataTo(&purchase)
+	if purchase.RemainingBuildCount <= 0 {
+		return fmt.Errorf("no remaining build count")
+	}
+	purchase.RemainingBuildCount--
+	_, err = client.Collection("users").Doc("v1").Collection("purchases").Doc(uid).Set(context.Background(), purchase)
+	return err
+}
