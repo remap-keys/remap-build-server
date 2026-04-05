@@ -28,6 +28,11 @@ RUN qmk setup --yes --home /root/versions/0.28.3 --branch 0.28.3
 RUN rm -rf /root/versions/0.28.3/keyboards/*
 RUN echo "{}" > /root/versions/0.28.3/data/mappings/keyboard_aliases.hjson
 
+RUN mkdir -p /root/versions/0.32.8
+RUN qmk setup --yes --home /root/versions/0.32.8 --branch 0.32.8
+RUN rm -rf /root/versions/0.32.8/keyboards/*
+RUN echo "{}" > /root/versions/0.32.8/data/mappings/keyboard_aliases.hjson
+
 COPY go.* ./
 RUN go mod download
 COPY ./main.go ./

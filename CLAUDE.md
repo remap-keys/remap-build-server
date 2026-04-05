@@ -49,7 +49,7 @@ Deployed to GCP via Cloud Build. The `cloudbuild.yaml` builds and pushes a Docke
 
 ### QMK Firmware Versions
 
-The Docker image ships multiple QMK versions under `/root/versions/<version>/` (currently 0.22.14 and 0.28.3). Each firmware/project specifies its target version. Keyboard source files are written into the version-specific `keyboards/` directory, compiled, then cleaned up.
+The Docker image ships multiple QMK versions under `/root/versions/<version>/` (currently 0.22.14, 0.28.3, and 0.32.8). Each firmware/project specifies its target version. Keyboard source files are written into the version-specific `keyboards/` directory, compiled, then cleaned up.
 
 ### Firestore Schema
 
