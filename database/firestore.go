@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -100,69 +99,6 @@ func UpdateTask(ctx context.Context, client *firestore.Client, taskId string, st
 		"updatedAt":        time.Now(),
 	}, firestore.MergeAll)
 	return err
-}
-
-func FetchCertificate(ctx context.Context, client *firestore.Client, key string) (*common.Certificate, error) {
-	iter := client.Collection("certificates").Where("domain", "==", key).Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if errors.Is(err, iterator.Done) {
-			break
-		}
-		if err != nil {
-			log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
-			return nil, err
-		}
-		var certificate common.Certificate
-		doc.DataTo(&certificate)
-		certificate.ID = doc.Ref.ID
-		log.Printf("[Info] Found the certificate from the Firestore: %v", certificate.ID)
-		return &certificate, nil
-	}
-	log.Printf("[Info] Certificate not found: %v", key)
-	return nil, nil
-}
-
-func SaveCertificate(ctx context.Context, client *firestore.Client, key string, data []byte) error {
-	certificate, err := FetchCertificate(ctx, client, key)
-	if err != nil {
-		log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
-		return err
-	}
-	log.Printf("[Info] Saving the certificate to the Firestore: %v", key)
-	if certificate == nil {
-		_, _, err := client.Collection("certificates").Add(ctx, common.Certificate{Domain: key, Data: data})
-		if err != nil {
-			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
-			return err
-		}
-	} else {
-		_, err := client.Collection("certificates").Doc(certificate.ID).Set(ctx, common.Certificate{Domain: key, Data: data})
-		if err != nil {
-			log.Printf("[Error] Failed to save the certificate to the Firestore: %v", err)
-			return err
-		}
-	}
-	log.Printf("[Info] Saved the certificate to the Firestore: %v", key)
-	return nil
-}
-
-func DeleteCertificate(ctx context.Context, client *firestore.Client, key string) error {
-	certificate, err := FetchCertificate(ctx, client, key)
-	if err != nil {
-		log.Printf("[Error] Failed to fetch the certificate from the Firestore: %v", err)
-		return err
-	}
-	if certificate == nil {
-		return fmt.Errorf("certificate not found")
-	}
-	_, err = client.Collection("certificates").Doc(certificate.ID).Delete(ctx)
-	if err != nil {
-		log.Printf("[Error] Failed to delete the certificate from the Firestore: %v", err)
-		return err
-	}
-	log.Printf("[Info] Deleted the certificate from the Firestore: %v", key)
-	return nil
 }
 
 // FetchWorkbenchProjectInfo fetches the workbench project information from the Firestore.
