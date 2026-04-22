@@ -79,12 +79,6 @@ type UserPurchase struct {
 	UpdatedAt           time.Time `firestore:"updatedAt"`
 }
 
-type Certificate struct {
-	ID     string `firestore:"-"`
-	Domain string `firestore:"domain"`
-	Data   []byte `firestore:"data"`
-}
-
 type RequestParameters struct {
 	Uid    string
 	TaskId string

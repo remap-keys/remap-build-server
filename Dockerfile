@@ -10,7 +10,7 @@ RUN apt-get -y update && apt-get -y upgrade && \
 
 WORKDIR /app
 
-ENV HOME /root
+ENV HOME=/root
 ENV PATH=$HOME/.local/bin:$PATH
 
 RUN python3 -m pip install --upgrade pip
@@ -50,4 +50,4 @@ RUN go build -mod=readonly -v -o server
 
 # EXPOSE 8088
 
-ENTRYPOINT /app/server
+ENTRYPOINT ["/app/server"]

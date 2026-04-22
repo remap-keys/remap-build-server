@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Remap Build Server is a Go HTTP server that builds QMK keyboard firmware on demand. It serves the [Remap](https://remap-keys.app) platform, accepting build requests via HTTPS, compiling QMK firmware with user-supplied source files, and uploading the resulting binary to Cloud Storage.
+Remap Build Server is a Go HTTP server that builds QMK keyboard firmware on demand. It serves the [Remap](https://remap-keys.app) platform, accepting build requests from Cloud Tasks, compiling QMK firmware with user-supplied source files, and uploading the resulting binary to Cloud Storage. Deployed to Cloud Run; TLS is terminated by the Cloud Run frontend.
 
 ## Build & Development Commands
 
@@ -28,13 +28,15 @@ docker-compose up
 
 ## Deployment
 
-Deployed to GCP via Cloud Build. The `cloudbuild.yaml` builds and pushes a Docker image to Artifact Registry (`asia-northeast1-docker.pkg.dev`).
+Deployed to Cloud Run (region `asia-northeast1`, service `remap-build-server`) via Cloud Build. The `cloudbuild.yaml` builds the Docker image, pushes it to Artifact Registry (`asia-northeast1-docker.pkg.dev`), and deploys to Cloud Run with memory=4Gi, cpu=2, timeout=3600s, concurrency=1.
+
+The server listens on the port specified by the `PORT` env var (defaults to 8080). TLS is terminated by Cloud Run — the Go process always speaks plain HTTP.
 
 ## Architecture
 
 ### Request Flow
 
-1. **`main.go`** — Single HTTPS endpoint `GET /build?uid=...&taskId=...` with autocert TLS (domain: `build.remap-keys.app`)
+1. **`main.go`** — Single endpoint `GET /build?uid=...&taskId=...` served as plain HTTP on `$PORT` (Cloud Run fronts it with TLS)
 2. **`web/parser.go`** — Extracts `uid` and `taskId` query parameters
 3. **`auth/token.go`** — Validates Google OIDC JWT Bearer token (must be from the specific GCP service account)
 4. **`database/firestore.go`** — Fetches task, firmware/project metadata, and source files from Firestore
@@ -59,10 +61,8 @@ The Docker image ships multiple QMK versions under `/root/versions/<version>/` (
 - `build/v1/projects/{projectId}` — Workbench project metadata
 - `build/v1/projects/{projectId}/keyboardFiles` and `keymapFiles` — Workbench source files
 - `users/v1/purchases/{uid}` — User purchase info (remaining build count)
-- `certificates/` — TLS certificate cache for autocert
 
 ### Key Design Decisions
 
 - All responses return HTTP 200 even on failure, to prevent Cloud Tasks from retrying failed builds. Actual status is written to Firestore.
-- TLS certificates are cached in Firestore (`web/certificate.go` implements `autocert.Cache`).
 - Auth validates against Google's OIDC public keys fetched at runtime from `accounts.google.com/.well-known/openid-configuration`.

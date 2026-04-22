@@ -12,7 +12,6 @@ import (
 	"cloud.google.com/go/firestore"
 	firebase "firebase.google.com/go"
 	"firebase.google.com/go/storage"
-	"golang.org/x/crypto/acme/autocert"
 	"remap-keys.app/remap-build-server/auth"
 	"remap-keys.app/remap-build-server/build"
 	"remap-keys.app/remap-build-server/common"
@@ -35,14 +34,6 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	certCache := web.NewFirestoreCertCache(firestoreClient)
-
-	certManager := autocert.Manager{
-		Prompt:     autocert.AcceptTOS,
-		Cache:      certCache,
-		HostPolicy: autocert.HostWhitelist("build.remap-keys.app"),
-	}
-
 	http.HandleFunc("/build", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			handleRequest(w, r, ctx, firestoreClient, storageClient)
@@ -51,24 +42,12 @@ func main() {
 		}
 	})
 
-	server := &http.Server{
-		Addr:      ":https",
-		TLSConfig: certManager.TLSConfig(),
-		Handler:   nil,
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
-
-	log.Printf("[Info] Listening on port 443")
-	log.Fatal(server.ListenAndServeTLS("", ""))
-
-	//port := "8080"
-	//h := func(w http.ResponseWriter, r *http.Request) {
-	//	handleRequest(w, r, ctx, firestoreClient, storageClient)
-	//}
-	//http.HandleFunc("/build", h)
-	//log.Printf("Remap Build Server is running on port %s.\n", port)
-	//if err := http.ListenAndServe(":"+port, nil); err != nil {
-	//	log.Fatal(err)
-	//}
+	log.Printf("[Info] Listening on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func createFirebaseApp(ctx context.Context) *firebase.App {
