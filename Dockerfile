@@ -17,7 +17,7 @@ RUN python3 -m pip install --upgrade pip
 
 RUN python3 -m pip install --user qmk
 
-ARG REMAP_QMK_MODULE_VERSION=v0.1.0
+ARG REMAP_QMK_MODULE_VERSION=v0.1.1
 
 RUN mkdir -p /root/versions/0.22.14
 RUN qmk setup --yes --home /root/versions/0.22.14 --branch 0.22.14
@@ -29,22 +29,24 @@ RUN mkdir -p /root/versions/0.28.3
 RUN qmk setup --yes --home /root/versions/0.28.3 --branch 0.28.3
 RUN rm -rf /root/versions/0.28.3/keyboards/*
 RUN echo "{}" > /root/versions/0.28.3/data/mappings/keyboard_aliases.hjson
-RUN git clone --depth 1 --branch ${REMAP_QMK_MODULE_VERSION} \
-    https://github.com/remap-keys/remap-qmk-module.git \
-    /root/versions/0.28.3/modules/remap
 
 RUN mkdir -p /root/versions/0.32.8
 RUN qmk setup --yes --home /root/versions/0.32.8 --branch 0.32.8
 RUN rm -rf /root/versions/0.32.8/keyboards/*
 RUN echo "{}" > /root/versions/0.32.8/data/mappings/keyboard_aliases.hjson
+
+RUN mkdir -p /root/versions/0.34.0
+RUN qmk setup --yes --home /root/versions/0.34.0 --branch 0.34.0
+RUN rm -rf /root/versions/0.34.0/keyboards/*
+RUN echo "{}" > /root/versions/0.34.0/data/mappings/keyboard_aliases.hjson
 RUN git clone --depth 1 --branch ${REMAP_QMK_MODULE_VERSION} \
     https://github.com/remap-keys/remap-qmk-module.git \
-    /root/versions/0.32.8/modules/remap
+    /root/versions/0.34.0/modules/remap
 
-# Smoke test: fail the image build if remap-qmk-module is not in place
-# for every Community-Modules-capable QMK version.
-RUN test -f /root/versions/0.28.3/modules/remap/qmk_module.json \
- && test -f /root/versions/0.32.8/modules/remap/qmk_module.json
+# Smoke test: fail the image build if remap-qmk-module is not in place.
+# The module requires QMK community modules API >= 1.1.3, which first
+# ships with QMK 0.34.0, so we only install it under that version.
+RUN test -f /root/versions/0.34.0/modules/remap/qmk_module.json
 
 COPY go.* ./
 RUN go mod download

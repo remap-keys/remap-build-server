@@ -51,9 +51,9 @@ The server listens on the port specified by the `PORT` env var (defaults to 8080
 
 ### QMK Firmware Versions
 
-The Docker image ships multiple QMK versions under `/root/versions/<version>/` (currently 0.22.14, 0.28.3, and 0.32.8). Each firmware/project specifies its target version. Keyboard source files are written into the version-specific `keyboards/` directory, compiled, then cleaned up.
+The Docker image ships multiple QMK versions under `/root/versions/<version>/` (currently 0.22.14, 0.28.3, 0.32.8, and 0.34.0). Each firmware/project specifies its target version. Keyboard source files are written into the version-specific `keyboards/` directory, compiled, then cleaned up.
 
-Community-Modules-capable versions (0.28.3 and 0.32.8) additionally ship the [`remap-qmk-module`](https://github.com/remap-keys/remap-qmk-module) QMK Community Module pre-installed at `/root/versions/<version>/modules/remap/`. The module version is pinned in the Dockerfile via the `REMAP_QMK_MODULE_VERSION` build arg (default `v0.1.0`). Keyboards opt in by including `"modules": ["remap"]` in their `keymap.json` (and setting `VIA_ENABLE=no`); the server itself does not rewrite or validate those files.
+QMK 0.34.0 additionally ships the [`remap-qmk-module`](https://github.com/remap-keys/remap-qmk-module) QMK Community Module pre-installed at `/root/versions/0.34.0/modules/remap/`. The module version is pinned in the Dockerfile via the `REMAP_QMK_MODULE_VERSION` build arg (default `v0.1.1`). It is installed only under 0.34.0 because the module requires QMK community modules API >= 1.1.3, which first ships with QMK 0.34.0. Keyboards opt in by including `"modules": ["remap"]` in their `keymap.json` (and setting `VIA_ENABLE=no`); the server itself does not rewrite or validate those files.
 
 ### Firestore Schema
 
